@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 设计变量：调整整体风格只改这里。 */
+/* 颜色写成「红 绿 蓝」三个数字，方便叠加透明度；括号里是对应的十六进制色值。 */
+:root {
+  --c-brand: 27 73 101; /* 主色：沉稳的深蓝 (#1b4965) */
+  --c-brand-dark: 20 58 82; /* (#143a52) */
+  --c-brand-soft: 232 240 245; /* (#e8f0f5) */
+  --c-accent: 217 72 15; /* 强调色：只用于「加入购物车」「提交订货单」等主要操作 (#d9480f) */
+  --c-accent-dark: 185 60 10; /* (#b93c0a) */
+  --c-ink: 23 36 47; /* 正文 (#17242f) */
+  --c-muted: 85 100 114; /* 次要文字 (#556472) */
+  --c-faint: 138 150 163; /* 提示文字 (#8a96a3) */
+  --c-line: 226 232 238; /* 分隔线 (#e2e8ee) */
+  --c-page: 243 245 247; /* 页面底色 (#f3f5f7) */
+  --c-surface: 255 255 255; /* 卡片底色 (#ffffff) */
+  --r-card: 12px;
+  --r-control: 10px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    margin: 0;
+    background: rgb(var(--c-page));
+    color: rgb(var(--c-ink));
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC",
+      "Microsoft YaHei", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  /* iOS 上输入框字号小于 16px 会触发页面自动放大。 */
+  input,
+  button,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-brand));
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.55;
+  }
+}
+.skeleton {
+  background: #e6ebf0;
+  border-radius: 6px;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
