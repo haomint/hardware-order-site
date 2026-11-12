@@ -1,0 +1,4181 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "五金订货网站 · 阶段 A 接口契约",
+    "version": "0.1.0",
+    "description": "覆盖公开店铺资料、商品目录、后台分类与商品管理、管理员会话和图片上传。\n\n商品列表使用 page、pageSize 和 { items, total }。页码超过范围时 items 为空。分类列表一次返回全部匹配分类，格式仍为 { items, total }，其中 total 等于 items.length。\n\n列表查询参数只接受文档列出的单值字段。请求体的未知字段视为参数错误。PATCH 省略的字段保持原值。\n\n商品参考单价用整数分。priceCents 为 null 时显示「价格面议」。品牌和型号未填写时返回空字符串，前台隐藏相应项。新增时可以省略，编辑时传空字符串可清空。已上架商品可以同时缺货。\n\n生产环境同源访问，后台使用 HttpOnly、Secure、SameSite=Lax、Path=/ 的 Cookie。后台写操作校验 Origin。开发环境可通过环境配置加入前端开发服务器的完整来源。跨端口直连时仅对配置的来源开放带凭据的 CORS，前端请求使用 credentials: include。仅本地 HTTP 开发可省略 Cookie 的 Secure 属性。\n\n登录成功后会话有效期为 30 天。每次需登录的后台接口成功返回时，从本次请求起重新计算 30 天有效期，同时续发 Cookie。会话到期或主动退出后需重新登录。会话和后台数据禁止缓存。\n\n公开商品目录应重新验证或禁用缓存，使上下架、缺货和删除变更及时生效。图片以同源根路径公开静态访问，使用不可猜测的随机文件名，可长期缓存。替换图片时使用新路径，源站清理图片后客户端可能仍持有旧缓存。\n\nINVALID_REQUEST 可以附带 fieldErrors。键为字段路径，如 name 或 detailImageIds.0，数组下标从 0 开始。值为简体中文提示。无法定位字段时使用 message。"
+  },
+  "paths": {
+    "/api/shop": {
+      "get": {
+        "operationId": "getShop",
+        "tags": [
+          "公开目录"
+        ],
+        "summary": "查看店铺资料",
+        "description": "返回店名 name、联系电话 phone 和客服微信引导文案 wechatContactText，均来自服务端部署配置。",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100,
+                      "description": "店名。"
+                    },
+                    "phone": {
+                      "type": "string",
+                      "maxLength": 50,
+                      "description": "店铺公开联系电话，可包含区号。未配置时为空字符串。"
+                    },
+                    "wechatContactText": {
+                      "type": "string",
+                      "maxLength": 300,
+                      "description": "客服微信引导文案。未配置时为空字符串。"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "phone",
+                    "wechatContactText"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "operationId": "listCategories",
+        "tags": [
+          "公开目录"
+        ],
+        "summary": "查看分类",
+        "description": "一次返回所有至少关联一件上架商品的分类。已上架的缺货商品计入。按 sortOrder 升序，再按 createdAt 升序排列。排序值和创建时间均相同时按 id 升序稳定排列。",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 50,
+                            "description": "分类名称，去除首尾空白。"
+                          },
+                          "sortOrder": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9999,
+                            "description": "显示顺序，数字越小越靠前。"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "sortOrder",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "匹配条件的总条数。"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/products": {
+      "get": {
+        "operationId": "listProducts",
+        "tags": [
+          "公开目录"
+        ],
+        "summary": "浏览和搜索商品",
+        "description": "只返回上架商品，包含缺货商品。分类和关键字可同时使用。列表使用 mainImage.thumbnailUrl。置顶优先，其后按 sortOrder 升序、createdAt 降序排列。前三项均相同时按 id 升序，保证分页稳定。",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "description": "商品名，去除首尾空白。"
+                          },
+                          "brand": {
+                            "type": "string",
+                            "maxLength": 60,
+                            "description": "品牌，去除首尾空白。未填写时为空字符串。"
+                          },
+                          "model": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "description": "型号，去除首尾空白。未填写时为空字符串。"
+                          },
+                          "categoryId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          },
+                          "priceCents": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "参考单价，单位为分。null 表示价格面议，0 表示零元。"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 20,
+                            "description": "计量单位，例如件、盒或米。"
+                          },
+                          "isOutOfStock": {
+                            "type": "boolean",
+                            "description": "缺货商品仍可在上架时展示，前台应禁用加入购物车。"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                          },
+                          "mainImage": {
+                            "type": "object",
+                            "properties": {
+                              "imageUrl": {
+                                "type": "string",
+                                "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                                "description": "同源压缩图路径，长边不超过 1600 像素。"
+                              },
+                              "thumbnailUrl": {
+                                "type": "string",
+                                "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                                "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                              }
+                            },
+                            "required": [
+                              "imageUrl",
+                              "thumbnailUrl"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "brand",
+                          "model",
+                          "categoryId",
+                          "priceCents",
+                          "unit",
+                          "isOutOfStock",
+                          "createdAt",
+                          "mainImage"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "匹配条件的总条数。"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "页码，从 1 开始。",
+            "schema": {
+              "default": "1",
+              "description": "页码，从 1 开始。",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,8}$"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "description": "每页条数，1 至 100。",
+            "schema": {
+              "default": "20",
+              "description": "每页条数，1 至 100。",
+              "type": "string",
+              "pattern": "^(?:[1-9][0-9]?|100)$"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "匹配名称、品牌或型号中包含的文字。空白等同于未搜索，英文字母忽略大小写。",
+            "schema": {
+              "description": "匹配名称、品牌或型号中包含的文字。空白等同于未搜索，英文字母忽略大小写。",
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "required": false,
+            "description": "按分类筛选。分类不存在时返回空列表。",
+            "schema": {
+              "description": "按分类筛选。分类不存在时返回空列表。",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/products/{id}": {
+      "get": {
+        "operationId": "getProduct",
+        "tags": [
+          "公开目录"
+        ],
+        "summary": "查看商品详情",
+        "description": "下架与不存在均返回 PRODUCT_NOT_FOUND。缺货商品仍返回详情。",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100,
+                      "description": "商品名，去除首尾空白。"
+                    },
+                    "brand": {
+                      "type": "string",
+                      "maxLength": 60,
+                      "description": "品牌，去除首尾空白。未填写时为空字符串。"
+                    },
+                    "model": {
+                      "type": "string",
+                      "maxLength": 100,
+                      "description": "型号，去除首尾空白。未填写时为空字符串。"
+                    },
+                    "categoryId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "priceCents": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "参考单价，单位为分。null 表示价格面议，0 表示零元。"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20,
+                      "description": "计量单位，例如件、盒或米。"
+                    },
+                    "isOutOfStock": {
+                      "type": "boolean",
+                      "description": "缺货商品仍可在上架时展示，前台应禁用加入购物车。"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                    },
+                    "mainImage": {
+                      "type": "object",
+                      "properties": {
+                        "imageUrl": {
+                          "type": "string",
+                          "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                          "description": "同源压缩图路径，长边不超过 1600 像素。"
+                        },
+                        "thumbnailUrl": {
+                          "type": "string",
+                          "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                          "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                        }
+                      },
+                      "required": [
+                        "imageUrl",
+                        "thumbnailUrl"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "specifications": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 3000,
+                      "description": "性能和参数说明，纯文本，可换行。"
+                    },
+                    "detailImages": {
+                      "maxItems": 5,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "imageUrl": {
+                            "type": "string",
+                            "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                            "description": "同源压缩图路径，长边不超过 1600 像素。"
+                          },
+                          "thumbnailUrl": {
+                            "type": "string",
+                            "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                            "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                          }
+                        },
+                        "required": [
+                          "imageUrl",
+                          "thumbnailUrl"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "brand",
+                    "model",
+                    "categoryId",
+                    "priceCents",
+                    "unit",
+                    "isOutOfStock",
+                    "createdAt",
+                    "mainImage",
+                    "specifications",
+                    "detailImages"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到该商品。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "PRODUCT_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "PRODUCT_NOT_FOUND": {
+                    "value": {
+                      "code": "PRODUCT_NOT_FOUND",
+                      "message": "找不到该商品。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "服务端分配的 UUID，客户端按字符串使用。",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "description": "服务端分配的 UUID，客户端按字符串使用。"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/login": {
+      "post": {
+        "operationId": "login",
+        "tags": [
+          "管理员会话"
+        ],
+        "summary": "登录后台",
+        "description": "验证账号和密码后签发新会话，响应体只返回账号。错误凭证使用同一提示。达到登录频率限制时返回 429。",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "username": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "管理员账号，去除首尾空白。"
+                    }
+                  },
+                  "required": [
+                    "username"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "签发新的管理员会话 Cookie。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "账号或密码不正确。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_CREDENTIALS"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_CREDENTIALS": {
+                    "value": {
+                      "code": "INVALID_CREDENTIALS",
+                      "message": "账号或密码不正确。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "尝试次数过多，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "TOO_MANY_REQUESTS"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "TOO_MANY_REQUESTS": {
+                    "value": {
+                      "code": "TOO_MANY_REQUESTS",
+                      "message": "尝试次数过多，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "管理员账号，去除首尾空白。"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "description": "管理员密码，保留原样。"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/session": {
+      "get": {
+        "operationId": "getSession",
+        "tags": [
+          "管理员会话"
+        ],
+        "summary": "检查管理员登录状态",
+        "description": "打开或刷新后台时检查会话，并在成功时续期。会话不存在或失效时返回 401。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "username": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "管理员账号，去除首尾空白。"
+                    }
+                  },
+                  "required": [
+                    "username"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/logout": {
+      "post": {
+        "operationId": "logout",
+        "tags": [
+          "管理员会话"
+        ],
+        "summary": "退出后台",
+        "description": "注销现有会话并清除 Cookie。会话已过期或未登录时也返回 204。",
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "操作成功，无响应体。",
+            "headers": {
+              "Set-Cookie": {
+                "description": "清除管理员会话 Cookie。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/categories": {
+      "get": {
+        "operationId": "listAdminCategories",
+        "tags": [
+          "后台分类"
+        ],
+        "summary": "查看后台分类列表",
+        "description": "一次返回所有分类，包含没有上架商品的分类。按 sortOrder 升序，再按 createdAt 升序排列。排序值和创建时间均相同时按 id 升序稳定排列。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 50,
+                            "description": "分类名称，去除首尾空白。"
+                          },
+                          "sortOrder": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9999,
+                            "description": "显示顺序，数字越小越靠前。"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "sortOrder",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "匹配条件的总条数。"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCategory",
+        "tags": [
+          "后台分类"
+        ],
+        "summary": "新增分类",
+        "description": "分类名去除首尾空白后精确判重。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50,
+                      "description": "分类名称，去除首尾空白。"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9999,
+                      "description": "显示顺序，数字越小越靠前。"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sortOrder",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "已有同名分类。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "CATEGORY_NAME_EXISTS"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "CATEGORY_NAME_EXISTS": {
+                    "value": {
+                      "code": "CATEGORY_NAME_EXISTS",
+                      "message": "已有同名分类。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "description": "分类名称，去除首尾空白。"
+                  },
+                  "sortOrder": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9999,
+                    "description": "显示顺序，数字越小越靠前。"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/categories/{id}": {
+      "patch": {
+        "operationId": "updateCategory",
+        "tags": [
+          "后台分类"
+        ],
+        "summary": "改名或调整分类排序",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50,
+                      "description": "分类名称，去除首尾空白。"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9999,
+                      "description": "显示顺序，数字越小越靠前。"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sortOrder",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到该分类。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "CATEGORY_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "CATEGORY_NOT_FOUND": {
+                    "value": {
+                      "code": "CATEGORY_NOT_FOUND",
+                      "message": "找不到该分类。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "已有同名分类。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "CATEGORY_NAME_EXISTS"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "CATEGORY_NAME_EXISTS": {
+                    "value": {
+                      "code": "CATEGORY_NAME_EXISTS",
+                      "message": "已有同名分类。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "服务端分配的 UUID，客户端按字符串使用。",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "description": "服务端分配的 UUID，客户端按字符串使用。"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "description": "分类名称，去除首尾空白。"
+                  },
+                  "sortOrder": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9999,
+                    "description": "显示顺序，数字越小越靠前。"
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 1
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCategory",
+        "tags": [
+          "后台分类"
+        ],
+        "summary": "删除空分类",
+        "description": "有商品关联时返回 CATEGORY_IN_USE，关联的下架商品也计入。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "操作成功，无响应体。",
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到该分类。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "CATEGORY_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "CATEGORY_NOT_FOUND": {
+                    "value": {
+                      "code": "CATEGORY_NOT_FOUND",
+                      "message": "找不到该分类。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "该分类下还有商品，请先将商品移到其他分类。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "CATEGORY_IN_USE"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "CATEGORY_IN_USE": {
+                    "value": {
+                      "code": "CATEGORY_IN_USE",
+                      "message": "该分类下还有商品，请先将商品移到其他分类。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "服务端分配的 UUID，客户端按字符串使用。",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "description": "服务端分配的 UUID，客户端按字符串使用。"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/products": {
+      "get": {
+        "operationId": "listAdminProducts",
+        "tags": [
+          "后台商品"
+        ],
+        "summary": "查看和搜索后台商品",
+        "description": "默认包含上架、下架和缺货商品。筛选项同时提供时须全部匹配。置顶优先，其后按 sortOrder 升序、createdAt 降序排列。前三项均相同时按 id 升序，保证分页稳定。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "description": "商品名，去除首尾空白。"
+                          },
+                          "brand": {
+                            "type": "string",
+                            "maxLength": 60,
+                            "description": "品牌，去除首尾空白。未填写时为空字符串。"
+                          },
+                          "model": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "description": "型号，去除首尾空白。未填写时为空字符串。"
+                          },
+                          "categoryId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          },
+                          "priceCents": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "参考单价，单位为分。null 表示价格面议，0 表示零元。"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 20,
+                            "description": "计量单位，例如件、盒或米。"
+                          },
+                          "isOutOfStock": {
+                            "type": "boolean",
+                            "description": "缺货商品仍可在上架时展示，前台应禁用加入购物车。"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                          },
+                          "mainImage": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "imageUrl": {
+                                    "type": "string",
+                                    "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                                    "description": "同源压缩图路径，长边不超过 1600 像素。"
+                                  },
+                                  "thumbnailUrl": {
+                                    "type": "string",
+                                    "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                                    "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                                    "description": "服务端分配的 UUID，客户端按字符串使用。"
+                                  }
+                                },
+                                "required": [
+                                  "imageUrl",
+                                  "thumbnailUrl",
+                                  "id"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "specifications": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 3000,
+                            "description": "性能和参数说明，纯文本，可换行。"
+                          },
+                          "detailImages": {
+                            "maxItems": 5,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "imageUrl": {
+                                  "type": "string",
+                                  "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                                  "description": "同源压缩图路径，长边不超过 1600 像素。"
+                                },
+                                "thumbnailUrl": {
+                                  "type": "string",
+                                  "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                                  "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                                  "description": "服务端分配的 UUID，客户端按字符串使用。"
+                                }
+                              },
+                              "required": [
+                                "imageUrl",
+                                "thumbnailUrl",
+                                "id"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "isPublished": {
+                            "type": "boolean",
+                            "description": "是否上架。下架商品在公开列表和详情中均不可见。"
+                          },
+                          "isPinned": {
+                            "type": "boolean",
+                            "description": "是否置顶。置顶商品排在普通商品之前。"
+                          },
+                          "sortOrder": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9999,
+                            "description": "显示顺序，数字越小越靠前。"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "brand",
+                          "model",
+                          "categoryId",
+                          "priceCents",
+                          "unit",
+                          "isOutOfStock",
+                          "createdAt",
+                          "mainImage",
+                          "specifications",
+                          "detailImages",
+                          "isPublished",
+                          "isPinned",
+                          "sortOrder"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "匹配条件的总条数。"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "页码，从 1 开始。",
+            "schema": {
+              "default": "1",
+              "description": "页码，从 1 开始。",
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,8}$"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "description": "每页条数，1 至 100。",
+            "schema": {
+              "default": "20",
+              "description": "每页条数，1 至 100。",
+              "type": "string",
+              "pattern": "^(?:[1-9][0-9]?|100)$"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "匹配名称、品牌或型号中包含的文字。空白等同于未搜索，英文字母忽略大小写。",
+            "schema": {
+              "description": "匹配名称、品牌或型号中包含的文字。空白等同于未搜索，英文字母忽略大小写。",
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "required": false,
+            "description": "按分类筛选。分类不存在时返回空列表。",
+            "schema": {
+              "description": "按分类筛选。分类不存在时返回空列表。",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$"
+            }
+          },
+          {
+            "name": "isPublished",
+            "in": "query",
+            "required": false,
+            "description": "按上架或下架筛选。省略时查询全部。",
+            "schema": {
+              "description": "按上架或下架筛选。省略时查询全部。",
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "isOutOfStock",
+            "in": "query",
+            "required": false,
+            "description": "按缺货状态筛选。",
+            "schema": {
+              "description": "按缺货状态筛选。",
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createProduct",
+        "tags": [
+          "后台商品"
+        ],
+        "summary": "新增商品",
+        "description": "默认下架、未缺货、未置顶。发布时必须有主图。图片字段使用上传接口返回的 ID。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100,
+                      "description": "商品名，去除首尾空白。"
+                    },
+                    "brand": {
+                      "type": "string",
+                      "maxLength": 60,
+                      "description": "品牌，去除首尾空白。未填写时为空字符串。"
+                    },
+                    "model": {
+                      "type": "string",
+                      "maxLength": 100,
+                      "description": "型号，去除首尾空白。未填写时为空字符串。"
+                    },
+                    "categoryId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "priceCents": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "参考单价，单位为分。null 表示价格面议，0 表示零元。"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20,
+                      "description": "计量单位，例如件、盒或米。"
+                    },
+                    "isOutOfStock": {
+                      "type": "boolean",
+                      "description": "缺货商品仍可在上架时展示，前台应禁用加入购物车。"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                    },
+                    "mainImage": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "imageUrl": {
+                              "type": "string",
+                              "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                              "description": "同源压缩图路径，长边不超过 1600 像素。"
+                            },
+                            "thumbnailUrl": {
+                              "type": "string",
+                              "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                              "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                              "description": "服务端分配的 UUID，客户端按字符串使用。"
+                            }
+                          },
+                          "required": [
+                            "imageUrl",
+                            "thumbnailUrl",
+                            "id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "specifications": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 3000,
+                      "description": "性能和参数说明，纯文本，可换行。"
+                    },
+                    "detailImages": {
+                      "maxItems": 5,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "imageUrl": {
+                            "type": "string",
+                            "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                            "description": "同源压缩图路径，长边不超过 1600 像素。"
+                          },
+                          "thumbnailUrl": {
+                            "type": "string",
+                            "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                            "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          }
+                        },
+                        "required": [
+                          "imageUrl",
+                          "thumbnailUrl",
+                          "id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "isPublished": {
+                      "type": "boolean",
+                      "description": "是否上架。下架商品在公开列表和详情中均不可见。"
+                    },
+                    "isPinned": {
+                      "type": "boolean",
+                      "description": "是否置顶。置顶商品排在普通商品之前。"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9999,
+                      "description": "显示顺序，数字越小越靠前。"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "brand",
+                    "model",
+                    "categoryId",
+                    "priceCents",
+                    "unit",
+                    "isOutOfStock",
+                    "createdAt",
+                    "mainImage",
+                    "specifications",
+                    "detailImages",
+                    "isPublished",
+                    "isPinned",
+                    "sortOrder"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到该分类。 图片不存在或上传已失效，请重新上传。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "CATEGORY_NOT_FOUND",
+                            "IMAGE_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "CATEGORY_NOT_FOUND": {
+                    "value": {
+                      "code": "CATEGORY_NOT_FOUND",
+                      "message": "找不到该分类。"
+                    }
+                  },
+                  "IMAGE_NOT_FOUND": {
+                    "value": {
+                      "code": "IMAGE_NOT_FOUND",
+                      "message": "图片不存在或上传已失效，请重新上传。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "上架时必须指定主图，主图和详情图不得重复。",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "商品名，去除首尾空白。"
+                  },
+                  "brand": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 60,
+                    "description": "品牌，去除首尾空白。未填写时为空字符串。"
+                  },
+                  "model": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "型号，去除首尾空白。未填写时为空字符串。"
+                  },
+                  "categoryId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                    "description": "服务端分配的 UUID，客户端按字符串使用。"
+                  },
+                  "priceCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "参考单价，单位为分。null 表示价格面议，0 表示零元。"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20,
+                    "description": "计量单位，例如件、盒或米。"
+                  },
+                  "isOutOfStock": {
+                    "default": false,
+                    "type": "boolean",
+                    "description": "缺货商品仍可在上架时展示，前台应禁用加入购物车。"
+                  },
+                  "specifications": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 3000,
+                    "description": "性能和参数说明，纯文本，可换行。"
+                  },
+                  "isPublished": {
+                    "default": false,
+                    "type": "boolean",
+                    "description": "是否上架。下架商品在公开列表和详情中均不可见。"
+                  },
+                  "isPinned": {
+                    "default": false,
+                    "type": "boolean",
+                    "description": "是否置顶。置顶商品排在普通商品之前。"
+                  },
+                  "sortOrder": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9999,
+                    "description": "显示顺序，数字越小越靠前。"
+                  },
+                  "mainImageId": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                        "description": "服务端分配的 UUID，客户端按字符串使用。"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "主图 ID。null 表示清空主图，仅允许商品处于下架状态。"
+                  },
+                  "detailImageIds": {
+                    "default": [],
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "uniqueItems": true,
+                    "description": "详情图 ID，按数组顺序显示。保存时替换整组，空数组表示移除全部详情图。"
+                  }
+                },
+                "required": [
+                  "name",
+                  "categoryId",
+                  "priceCents",
+                  "unit",
+                  "specifications"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/products/{id}": {
+      "get": {
+        "operationId": "getAdminProduct",
+        "tags": [
+          "后台商品"
+        ],
+        "summary": "查看后台商品详情",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100,
+                      "description": "商品名，去除首尾空白。"
+                    },
+                    "brand": {
+                      "type": "string",
+                      "maxLength": 60,
+                      "description": "品牌，去除首尾空白。未填写时为空字符串。"
+                    },
+                    "model": {
+                      "type": "string",
+                      "maxLength": 100,
+                      "description": "型号，去除首尾空白。未填写时为空字符串。"
+                    },
+                    "categoryId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "priceCents": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "参考单价，单位为分。null 表示价格面议，0 表示零元。"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20,
+                      "description": "计量单位，例如件、盒或米。"
+                    },
+                    "isOutOfStock": {
+                      "type": "boolean",
+                      "description": "缺货商品仍可在上架时展示，前台应禁用加入购物车。"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                    },
+                    "mainImage": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "imageUrl": {
+                              "type": "string",
+                              "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                              "description": "同源压缩图路径，长边不超过 1600 像素。"
+                            },
+                            "thumbnailUrl": {
+                              "type": "string",
+                              "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                              "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                              "description": "服务端分配的 UUID，客户端按字符串使用。"
+                            }
+                          },
+                          "required": [
+                            "imageUrl",
+                            "thumbnailUrl",
+                            "id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "specifications": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 3000,
+                      "description": "性能和参数说明，纯文本，可换行。"
+                    },
+                    "detailImages": {
+                      "maxItems": 5,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "imageUrl": {
+                            "type": "string",
+                            "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                            "description": "同源压缩图路径，长边不超过 1600 像素。"
+                          },
+                          "thumbnailUrl": {
+                            "type": "string",
+                            "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                            "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          }
+                        },
+                        "required": [
+                          "imageUrl",
+                          "thumbnailUrl",
+                          "id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "isPublished": {
+                      "type": "boolean",
+                      "description": "是否上架。下架商品在公开列表和详情中均不可见。"
+                    },
+                    "isPinned": {
+                      "type": "boolean",
+                      "description": "是否置顶。置顶商品排在普通商品之前。"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9999,
+                      "description": "显示顺序，数字越小越靠前。"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "brand",
+                    "model",
+                    "categoryId",
+                    "priceCents",
+                    "unit",
+                    "isOutOfStock",
+                    "createdAt",
+                    "mainImage",
+                    "specifications",
+                    "detailImages",
+                    "isPublished",
+                    "isPinned",
+                    "sortOrder"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到该商品。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "PRODUCT_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "PRODUCT_NOT_FOUND": {
+                    "value": {
+                      "code": "PRODUCT_NOT_FOUND",
+                      "message": "找不到该商品。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "服务端分配的 UUID，客户端按字符串使用。",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "description": "服务端分配的 UUID，客户端按字符串使用。"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateProduct",
+        "tags": [
+          "后台商品"
+        ],
+        "summary": "编辑商品、变更上架及缺货状态、维护图片",
+        "description": "合并修改后校验完整商品。上架必须有主图，主图和详情图不得重复。将图片 ID 从 detailImageIds 移除即可解除详情图关联。主图可以替换，或在商品下架时通过 mainImageId=null 清空。移除的图片在没有商品引用时由服务端清理。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100,
+                      "description": "商品名，去除首尾空白。"
+                    },
+                    "brand": {
+                      "type": "string",
+                      "maxLength": 60,
+                      "description": "品牌，去除首尾空白。未填写时为空字符串。"
+                    },
+                    "model": {
+                      "type": "string",
+                      "maxLength": 100,
+                      "description": "型号，去除首尾空白。未填写时为空字符串。"
+                    },
+                    "categoryId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "priceCents": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "参考单价，单位为分。null 表示价格面议，0 表示零元。"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20,
+                      "description": "计量单位，例如件、盒或米。"
+                    },
+                    "isOutOfStock": {
+                      "type": "boolean",
+                      "description": "缺货商品仍可在上架时展示，前台应禁用加入购物车。"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                    },
+                    "mainImage": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "imageUrl": {
+                              "type": "string",
+                              "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                              "description": "同源压缩图路径，长边不超过 1600 像素。"
+                            },
+                            "thumbnailUrl": {
+                              "type": "string",
+                              "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                              "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                            },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                              "description": "服务端分配的 UUID，客户端按字符串使用。"
+                            }
+                          },
+                          "required": [
+                            "imageUrl",
+                            "thumbnailUrl",
+                            "id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "specifications": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 3000,
+                      "description": "性能和参数说明，纯文本，可换行。"
+                    },
+                    "detailImages": {
+                      "maxItems": 5,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "imageUrl": {
+                            "type": "string",
+                            "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                            "description": "同源压缩图路径，长边不超过 1600 像素。"
+                          },
+                          "thumbnailUrl": {
+                            "type": "string",
+                            "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                            "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          }
+                        },
+                        "required": [
+                          "imageUrl",
+                          "thumbnailUrl",
+                          "id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "isPublished": {
+                      "type": "boolean",
+                      "description": "是否上架。下架商品在公开列表和详情中均不可见。"
+                    },
+                    "isPinned": {
+                      "type": "boolean",
+                      "description": "是否置顶。置顶商品排在普通商品之前。"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9999,
+                      "description": "显示顺序，数字越小越靠前。"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "brand",
+                    "model",
+                    "categoryId",
+                    "priceCents",
+                    "unit",
+                    "isOutOfStock",
+                    "createdAt",
+                    "mainImage",
+                    "specifications",
+                    "detailImages",
+                    "isPublished",
+                    "isPinned",
+                    "sortOrder"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到该商品。 找不到该分类。 图片不存在或上传已失效，请重新上传。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "PRODUCT_NOT_FOUND",
+                            "CATEGORY_NOT_FOUND",
+                            "IMAGE_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "PRODUCT_NOT_FOUND": {
+                    "value": {
+                      "code": "PRODUCT_NOT_FOUND",
+                      "message": "找不到该商品。"
+                    }
+                  },
+                  "CATEGORY_NOT_FOUND": {
+                    "value": {
+                      "code": "CATEGORY_NOT_FOUND",
+                      "message": "找不到该分类。"
+                    }
+                  },
+                  "IMAGE_NOT_FOUND": {
+                    "value": {
+                      "code": "IMAGE_NOT_FOUND",
+                      "message": "图片不存在或上传已失效，请重新上传。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "服务端分配的 UUID，客户端按字符串使用。",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "description": "服务端分配的 UUID，客户端按字符串使用。"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "商品名，去除首尾空白。"
+                  },
+                  "brand": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "description": "品牌，去除首尾空白。未填写时为空字符串。"
+                  },
+                  "model": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "型号，去除首尾空白。未填写时为空字符串。"
+                  },
+                  "categoryId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                    "description": "服务端分配的 UUID，客户端按字符串使用。"
+                  },
+                  "priceCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "参考单价，单位为分。null 表示价格面议，0 表示零元。"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20,
+                    "description": "计量单位，例如件、盒或米。"
+                  },
+                  "isOutOfStock": {
+                    "type": "boolean",
+                    "description": "缺货商品仍可在上架时展示，前台应禁用加入购物车。"
+                  },
+                  "specifications": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 3000,
+                    "description": "性能和参数说明，纯文本，可换行。"
+                  },
+                  "isPublished": {
+                    "type": "boolean",
+                    "description": "是否上架。下架商品在公开列表和详情中均不可见。"
+                  },
+                  "isPinned": {
+                    "type": "boolean",
+                    "description": "是否置顶。置顶商品排在普通商品之前。"
+                  },
+                  "sortOrder": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9999,
+                    "description": "显示顺序，数字越小越靠前。"
+                  },
+                  "mainImageId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                        "description": "服务端分配的 UUID，客户端按字符串使用。"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "主图 ID。null 表示清空主图，仅允许商品处于下架状态。"
+                  },
+                  "detailImageIds": {
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "uniqueItems": true,
+                    "description": "详情图 ID，按数组顺序显示。保存时替换整组，空数组表示移除全部详情图。"
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 1
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteProduct",
+        "tags": [
+          "后台商品"
+        ],
+        "summary": "删除商品",
+        "description": "上架和下架商品均可永久删除。前端二次确认后发出请求。成功后商品从前后台目录移除，关联图片仅在无其他引用时清理。阶段 B 的订单必须在下单时保存商品快照，历史订单的展示和处理不依赖商品记录仍然存在。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "操作成功，无响应体。",
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到该商品。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "PRODUCT_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "PRODUCT_NOT_FOUND": {
+                    "value": {
+                      "code": "PRODUCT_NOT_FOUND",
+                      "message": "找不到该商品。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "服务端分配的 UUID，客户端按字符串使用。",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "description": "服务端分配的 UUID，客户端按字符串使用。"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/images": {
+      "post": {
+        "operationId": "uploadImage",
+        "tags": [
+          "图片"
+        ],
+        "summary": "上传单张商品图片",
+        "description": "用 FormData 的 file 字段上传。服务端检查实际格式、文件大小和解码像素数（最多 2400 万），仅接受静态 JPEG、PNG 或 WebP。手机 HEIC 由前端转为 JPEG 并压缩后上传。重新编码生成压缩图（长边最多 1600 像素）和缩略图（长边最多 480 像素），不保存原图。上传后用返回的 id 保存商品，24 小时未关联的图片可被清理。Nginx 的请求体限制需容纳 10 MiB 文件和 multipart 封装开销，例如在上传路径设 client_max_body_size 11m。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "imageUrl": {
+                      "type": "string",
+                      "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                      "description": "同源压缩图路径，长边不超过 1600 像素。"
+                    },
+                    "thumbnailUrl": {
+                      "type": "string",
+                      "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                      "description": "同源列表缩略图路径，长边不超过 480 像素。"
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    }
+                  },
+                  "required": [
+                    "imageUrl",
+                    "thumbnailUrl",
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请选择符合要求且可以打开的图片。 请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_IMAGE",
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_IMAGE": {
+                    "value": {
+                      "code": "INVALID_IMAGE",
+                      "message": "请选择符合要求且可以打开的图片。"
+                    }
+                  },
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "contentEncoding": "binary",
+                    "minLength": 1,
+                    "maxLength": 10485760,
+                    "anyOf": [
+                      {
+                        "contentMediaType": "image/jpeg"
+                      },
+                      {
+                        "contentMediaType": "image/png"
+                      },
+                      {
+                        "contentMediaType": "image/webp"
+                      }
+                    ],
+                    "description": "单个图片文件，接受 image/jpeg、image/png、image/webp，最大 10 MiB。"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "adminSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "admin_session"
+      }
+    },
+    "schemas": {
+      "ApiError": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "INVALID_REQUEST"
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "description": "可直接显示的简体中文提示。客户端按 code 分支处理。"
+              },
+              "fieldErrors": {
+                "description": "INVALID_REQUEST 可以附带 fieldErrors。键为字段路径，如 name 或 detailImageIds.0，数组下标从 0 开始。值为简体中文提示。无法定位字段时使用 message。",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "可直接显示的简体中文提示。客户端按 code 分支处理。"
+                }
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "INVALID_ORIGIN",
+                  "INVALID_IMAGE",
+                  "UNAUTHENTICATED",
+                  "INVALID_CREDENTIALS",
+                  "CATEGORY_NOT_FOUND",
+                  "PRODUCT_NOT_FOUND",
+                  "IMAGE_NOT_FOUND",
+                  "CATEGORY_NAME_EXISTS",
+                  "CATEGORY_IN_USE",
+                  "TOO_MANY_REQUESTS",
+                  "INTERNAL_ERROR"
+                ]
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "description": "可直接显示的简体中文提示。客户端按 code 分支处理。"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  }
+}

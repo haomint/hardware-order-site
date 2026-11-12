@@ -1,0 +1,21 @@
+{
+  "name": "@hardware-order/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./index.ts",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "docs": "node ../server/scripts/generate-api.mjs",
+    "docs:check": "node ../server/scripts/generate-api.mjs --check"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
