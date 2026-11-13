@@ -10,6 +10,7 @@ export type {
   AdminSession,
   CreateProduct,
   UpdateProduct,
+  CartLookupResult,
 } from "../../../shared/index.ts";
 
 export type ListResult<T> = { items: T[]; total: number };

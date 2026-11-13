@@ -7,6 +7,7 @@ import { EmptyNotice, ToastHost } from "./components/Feedback.tsx";
 import { Home } from "./pages/Home.tsx";
 import { ProductDetail } from "./pages/ProductDetail.tsx";
 import { Categories } from "./pages/Categories.tsx";
+import { Cart } from "./pages/Cart.tsx";
 import { Privacy } from "./pages/Privacy.tsx";
 import { ContactSheet } from "./components/ContactSheet.tsx";
 
@@ -20,6 +21,7 @@ createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/categories" element={<Categories />} />
+          <Route path="/cart" element={<Cart />} />
           <Route path="/p/:id" element={<ProductDetail />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route

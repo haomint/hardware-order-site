@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { ProductListItem } from "../api/index.ts";
-import { addToCart } from "../lib/cart.ts";
+import { addToCart, MAX_LINES } from "../lib/cart.ts";
 import { brandModel } from "../lib/format.ts";
 import { toast } from "./Feedback.tsx";
 import { Price } from "./Price.tsx";
@@ -14,7 +14,10 @@ function AddButton({ product }: { product: ProductListItem }) {
       disabled={soldOut}
       aria-label={soldOut ? `${product.name}暂时缺货` : `把${product.name}加入购物车`}
       onClick={() => {
-        addToCart(product.id, 1);
+        if (addToCart(product, 1) === "full") {
+          toast(`购物车最多 ${MAX_LINES} 种商品，请先提交或移除一些`);
+          return;
+        }
         toast(`已加入购物车：${product.name.length > 12 ? product.name.slice(0, 12) + "…" : product.name}`);
       }}
       // 可点击区域 44px，看到的圆形按钮 34px。

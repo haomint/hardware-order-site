@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useCartCount } from "../lib/cart.ts";
 import { openContact } from "./ContactSheet.tsx";
-import { toast } from "./Feedback.tsx";
 import { CartIcon, GridIcon, HeadsetIcon, HomeIcon } from "./icons.tsx";
 
 /** 购物车数量角标。数量变化时轻跳一下，让客户注意到已经加进去了。 */
@@ -27,10 +26,6 @@ export function CartBadge({ className = "" }: { className?: string }) {
       {count > 99 ? "99+" : count}
     </span>
   );
-}
-
-export function openCart() {
-  toast("购物车页面将在下一阶段开放");
 }
 
 /** 底部导航：首页、分类、购物车、联系店铺。高度留出苹果手机底部横条的安全区。 */
@@ -63,13 +58,18 @@ export function TabBar() {
             <GridIcon size={24} strokeWidth={pathname === "/categories" ? 2.3 : 1.8} />
             分类
           </Link>
-          <button type="button" onClick={openCart} className={item(false)} aria-label={`购物车，已选 ${count} 种商品`}>
+          <Link
+            to="/cart"
+            className={item(pathname === "/cart")}
+            aria-current={pathname === "/cart" ? "page" : undefined}
+            aria-label={`购物车，已选 ${count} 种商品`}
+          >
             <span className="relative">
-              <CartIcon size={24} strokeWidth={1.8} />
+              <CartIcon size={24} strokeWidth={pathname === "/cart" ? 2.3 : 1.8} />
               <CartBadge className="-right-2.5 -top-1.5" />
             </span>
             购物车
-          </button>
+          </Link>
           <button type="button" onClick={openContact} className={item(false)}>
             <HeadsetIcon size={24} strokeWidth={1.8} />
             联系店铺

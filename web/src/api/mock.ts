@@ -18,6 +18,7 @@ import type {
   AdminProduct,
   AdminProductQuery,
   AdminSession,
+  CartLookupResult,
   Category,
   CategoryInput,
   CategoryPatch,
@@ -374,6 +375,26 @@ export function getProduct(productId: string): Promise<ProductDetail> {
       detailImages: found.detailImageIds.map(publicImage),
     };
   });
+}
+
+// ── 购物车与订货（阶段 B） ─────────────────────────────
+
+/** 约定：按输入顺序返回；上架未缺货为 available，上架缺货为 out_of_stock，其余为 unavailable。 */
+export function lookupCart(productIds: string[]): Promise<CartLookupResult> {
+  return respond(() => {
+    if (productIds.length > 100) fail(400, "INVALID_REQUEST", "请检查填写的内容后重试。", { productIds: "最多可提交 100 种商品。" });
+    return {
+      items: productIds.map((id) => {
+        const row = products.find((p) => p.id === id.toLowerCase() && p.isPublished);
+        if (!row) return { productId: id, availability: "unavailable" as const };
+        return {
+          productId: id,
+          availability: row.isOutOfStock ? ("out_of_stock" as const) : ("available" as const),
+          product: toListItem(row),
+        };
+      }),
+    };
+  }, 220);
 }
 
 // ── 管理员会话 ────────────────────────────────────────

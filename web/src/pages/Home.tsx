@@ -9,7 +9,7 @@ import { EmptyNotice, ErrorNotice, toast } from "../components/Feedback.tsx";
 import { BannerCarousel, ServiceStrip } from "../components/BannerCarousel.tsx";
 import type { BannerAction } from "../components/BannerCarousel.tsx";
 import { CategoryIcon } from "../components/Art.tsx";
-import { CartBadge, openCart, TabBar } from "../components/TabBar.tsx";
+import { CartBadge, TabBar } from "../components/TabBar.tsx";
 import { CartIcon, ChevronRightIcon, CloseIcon, PhoneIcon, SearchIcon } from "../components/icons.tsx";
 
 const PAGE_SIZE = 20;
@@ -122,15 +122,14 @@ export function Home() {
               <PhoneIcon size={23} />
             </a>
           )}
-          <button
-            type="button"
-            onClick={openCart}
+          <Link
+            to="/cart"
             aria-label="购物车"
             className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink active:bg-brand-soft"
           >
             <CartIcon size={25} />
             <CartBadge className="right-0 top-0.5" />
-          </button>
+          </Link>
         </div>
       </header>
 
