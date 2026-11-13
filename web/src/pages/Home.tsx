@@ -304,6 +304,9 @@ export function Home() {
         <footer className="pt-2 text-center text-[13px] leading-relaxed text-faint">
           <p>页面价格为参考价，最终金额以商家联系确认为准</p>
           {shop?.wechatContactText && <p>{shop.wechatContactText}</p>}
+          <Link to="/privacy" className="mt-1 inline-flex min-h-tap items-center text-[13px] text-muted underline underline-offset-2">
+            隐私说明
+          </Link>
         </footer>
       </div>
 
