@@ -187,7 +187,8 @@ export const stageB = {
       "下单时间用北京时间，格式 YYYY-MM-DD HH:mm。两列金额以元显示并保留两位小数。未记录的最终确认金额和自提地址留空，金额为零时显示 0.00。",
       `配送方式用${Object.values(orderCsvLabels.deliveryMethod).join(" / ")}。订单状态用${Object.values(orderCsvLabels.status).join(" / ")}。收款状态用${Object.values(orderCsvLabels.paymentStatus).join(" / ")}。`,
       "商品明细取下单快照，按商品名称、非空型号、数量和小计显示，面议项显示「面议」，多种商品用中文分号分隔。例如「冲击钻 GSB 570 ×1（¥329.00）；钻头 ×2（面议）」。",
-      "单元格按 CSV 规则转义。对可能被表格软件当作公式的用户输入文本加单引号前缀，包括忽略前导空白后以 =、+、- 或 @ 开头的内容。手机号统一加单引号前缀，按文本输出。",
+      '手机号通过 ^1[3-9][0-9]{9}$ 校验后，单元格值使用 ="13812345678" 形式，Excel 按文本显示完整号码。CSV 文件中的该字段写作 "=""13812345678"""。',
+      "联系人、收货地址、备注和商品明细等自由文本，忽略前导空白后若以 =、+、- 或 @ 开头，先加单引号前缀防止公式注入。所有字段按 CSV 规则转义。",
     ].join(" "),
     query: OrderExportQuerySchema,
     success: {
