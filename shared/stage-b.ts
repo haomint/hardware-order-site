@@ -42,9 +42,6 @@ export const stageBErrors = {
   ORDER_TOTAL_TOO_LARGE: { status: 409, message: "预估商品金额过大，请联系店铺确认。" },
 } as const;
 
-const baseCodes = [
-  "INVALID_REQUEST", "INVALID_ORIGIN", "UNAUTHENTICATED", "TOO_MANY_REQUESTS", "INTERNAL_ERROR",
-] as const;
 const productUnavailableCode = "ORDER_PRODUCTS_UNAVAILABLE";
 const orderErrorCodes = (Object.keys(stageBErrors) as (keyof typeof stageBErrors)[])
   .filter((code) => code !== "INVALID_REQUEST" && code !== productUnavailableCode);
