@@ -74,7 +74,10 @@ export function createOrderSubmissionLimiter(now: () => number) {
   };
 }
 
-export function createOrders(db: DatabaseSync, findProduct: FindProduct, now: () => number) {
+export function createOrders(
+  db: DatabaseSync, findProduct: FindProduct, now: () => number,
+  enqueueNotification: (orderNo: string, createdAt: number) => void,
+) {
   const byKey = db.prepare(`
     SELECT order_no, created_at, contact_name, items_json, estimated_total_cents, request_digest
     FROM orders WHERE idempotency_key = ?
@@ -160,6 +163,7 @@ export function createOrders(db: DatabaseSync, findProduct: FindProduct, now: ()
           receipt.orderNo, idempotencyKey, digest, timestamp, input.contactName, input.phone,
           input.deliveryMethod, address, input.note, JSON.stringify(receipt.items), receipt.estimatedTotalCents,
         );
+        enqueueNotification(receipt.orderNo, timestamp);
         return { receipt, replayed: false };
       });
     },

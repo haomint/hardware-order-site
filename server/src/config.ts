@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { AdminWriteOriginSchema, ShopSchema } from "../../shared/index.ts";
+import { loadWecomConfig } from "./wecom.ts";
 
 export function databasePath(env = process.env) {
   return resolve(env.DATABASE_PATH || "data/hardware-order.sqlite");
@@ -36,6 +37,7 @@ export function loadConfig(env = process.env) {
     trustProxy: trustProxy === "true",
     developmentOrigins,
     secureCookie: production || siteOrigin.startsWith("https://"),
+    wecom: loadWecomConfig(env),
     shop: ShopSchema.parse({
       name: env.SHOP_NAME ?? "威马五金",
       phone: env.SHOP_PHONE ?? "",

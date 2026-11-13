@@ -15,6 +15,7 @@ import { ApiFailure, OrderFailure, validate, type Schema } from "./errors.ts";
 import { createImages } from "./images.ts";
 import { createOrders, createOrderSubmissionLimiter } from "./orders.ts";
 import { orderCsvDisposition, streamOrderCsv } from "./order-csv.ts";
+import { createOrderNotifications } from "./order-notifications.ts";
 
 type NodeConnection = { incoming: IncomingMessage };
 type HttpEnv = {
@@ -111,11 +112,12 @@ function uploadQueue(): MiddlewareHandler<HttpEnv> {
   };
 }
 
-export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
+export function createApp(db: DatabaseSync, config: Config, now = Date.now, wecomRequest?: typeof fetch) {
   const app = new Hono<HttpEnv>();
   const auth = createAuth(db, now);
   const catalog = createCatalog(db, now);
-  const orders = createOrders(db, catalog.findPublicItem, now);
+  const notifications = createOrderNotifications(db, config.wecom, now, wecomRequest);
+  const orders = createOrders(db, catalog.findPublicItem, now, notifications.enqueue);
   const adminOrders = createAdminOrders(db, now);
   const limitOrderSubmission = createOrderSubmissionLimiter(now);
   const images = createImages(db, config.uploadDir, now);
@@ -283,6 +285,7 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
 
   return {
     app,
+    notifications,
     cleanup() {
       images.cleanup();
       auth.cleanup();

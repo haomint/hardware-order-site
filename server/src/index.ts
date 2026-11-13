@@ -5,7 +5,7 @@ import { createApp } from "./http.ts";
 
 const config = loadConfig();
 const db = openDatabase(config.databasePath);
-const { app, cleanup } = createApp(db, config);
+const { app, cleanup, notifications } = createApp(db, config);
 cleanup();
 
 const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => {
@@ -19,16 +19,36 @@ const sweep = setInterval(() => {
   }
 }, 15 * 60 * 1000).unref();
 
+function processNotifications() {
+  void notifications.processDue().catch(() => {
+    console.error("订单提醒处理失败，将在下次检查时继续。");
+  });
+}
+const notificationPoll = setInterval(processNotifications, 1000).unref();
+processNotifications();
+
+async function closeDatabase() {
+  try {
+    await notifications.drain();
+  } catch {
+    console.error("订单提醒处理失败，下次启动时继续。");
+  } finally {
+    db.close();
+  }
+}
+
 server.on("error", (error) => {
   console.error("HTTP 服务启动失败。", error);
   clearInterval(sweep);
-  db.close();
+  clearInterval(notificationPoll);
+  void closeDatabase();
   process.exitCode = 1;
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     clearInterval(sweep);
-    server.close(() => db.close());
+    clearInterval(notificationPoll);
+    server.close(() => { void closeDatabase(); });
   });
 }
