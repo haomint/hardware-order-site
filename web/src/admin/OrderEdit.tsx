@@ -10,6 +10,7 @@ import { ErrorNotice, toast } from "../components/Feedback.tsx";
 import { BackIcon, CopyIcon, PhoneIcon } from "../components/icons.tsx";
 import { Button, ConfirmDialog, TextArea, TextInput } from "./ui.tsx";
 import { DELIVERY, formatTime, PAYMENT, STATUS, STATUS_ORDER } from "./orderLabels.ts";
+import { OrderNotification } from "./OrderNotification.tsx";
 
 /** 「12」「12.5」「12.50」转成分；格式不对返回 null。 */
 function yuanToCents(text: string): number | null {
@@ -51,10 +52,27 @@ export function OrderEdit() {
   }
   if (!order) return <p className="py-10 text-center text-muted">正在加载…</p>;
 
-  return <Editor order={order} onChange={setOrder} onBack={goBack} />;
+  return (
+    <Editor
+      order={order}
+      onChange={setOrder}
+      onNotification={(fields) => setOrder((previous) => previous && { ...previous, ...fields })}
+      onBack={goBack}
+    />
+  );
 }
 
-function Editor({ order, onChange, onBack }: { order: OrderDetail; onChange: (o: OrderDetail) => void; onBack: () => void }) {
+function Editor({
+  order,
+  onChange,
+  onNotification,
+  onBack,
+}: {
+  order: OrderDetail;
+  onChange: (o: OrderDetail) => void;
+  onNotification: (fields: Pick<OrderDetail, "notificationStatus" | "notificationLastAttemptAt">) => void;
+  onBack: () => void;
+}) {
   const [saving, setSaving] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<OrderStatus | null>(null);
   const [reason, setReason] = useState(order.cancellationReason ?? "");
@@ -145,6 +163,8 @@ function Editor({ order, onChange, onBack }: { order: OrderDetail; onChange: (o:
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[14px] font-medium text-amber-900">已完成但还未收款，收到款后请在下方改为「已收款」。</p>
         )}
       </section>
+
+      <OrderNotification order={order} onChange={onNotification} />
 
       {/* 修改状态 */}
       <Card title="订单状态" note={`状态更新于 ${formatTime(order.statusUpdatedAt)}`}>

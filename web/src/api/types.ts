@@ -13,9 +13,15 @@ export type {
   CartLookupResult,
   CreateOrder,
   OrderReceipt,
-  OrderPage,
-  OrderDetail,
   UpdateOrder,
+  NotificationStatus,
+  notificationRetryTiming,
+} from "../../../shared/index.ts";
+
+// 阶段 C 起，后台订单列表和详情都带提醒状态。后端未升级时这两个字段不存在，页面按「无提醒记录」处理。
+export type {
+  OrderPageWithNotification as OrderPage,
+  OrderDetailWithNotification as OrderDetail,
 } from "../../../shared/index.ts";
 
 export type OrderStatus = "pending_contact" | "pending_payment" | "pending_fulfillment" | "completed" | "cancelled";

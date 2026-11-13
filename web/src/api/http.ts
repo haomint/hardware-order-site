@@ -38,7 +38,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (response.ok) {
     if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
+    try {
+      return (await response.json()) as T;
+    } catch (error) {
+      // 响应头到了但正文没下载完（断网）也算网络错误，调用方据此沿用幂等键重试。
+      // 正文格式不对则是服务端问题，保留原状态码，调用方不能据此断定请求未被受理。
+      if (error instanceof SyntaxError) throw new ApiError(response.status, "INTERNAL_ERROR", FALLBACK_MESSAGE);
+      throw new ApiError(0, "NETWORK_ERROR", NETWORK_MESSAGE);
+    }
   }
 
   let code = "INTERNAL_ERROR";
@@ -180,12 +187,21 @@ export async function orderExportLink(from: string, to: string): Promise<OrderEx
   return { url: `/api/admin/orders/export${toSearch({ from, to })}` };
 }
 
-export function getAdminOrder(orderNo: string): Promise<OrderDetail> {
-  return request(`/api/admin/orders/${id(orderNo)}`);
+/** signal 用于轮询时给单次查询设上限，超时即放弃。 */
+export function getAdminOrder(orderNo: string, signal?: AbortSignal): Promise<OrderDetail> {
+  return request(`/api/admin/orders/${id(orderNo)}`, { signal });
 }
 
 export function updateAdminOrder(orderNo: string, patch: UpdateOrder): Promise<OrderDetail> {
   return request(`/api/admin/orders/${id(orderNo)}`, json("PATCH", patch));
+}
+
+/** 手动重发新订单提醒。一次点击一个键，网络重试沿用同一个键（阶段 C）。 */
+export function retryAdminNotification(orderNo: string, idempotencyKey: string): Promise<OrderDetail> {
+  return request(`/api/admin/orders/${id(orderNo)}/notifications/retry`, {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+  });
 }
 
 // ── 图片 ──────────────────────────────────────────────
