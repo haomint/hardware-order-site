@@ -196,6 +196,8 @@ test("CSV 按北京时间范围导出订单快照，金额和手机号按 Excel 
   db.prepare("UPDATE products SET model = 'GSB 570', price_cents = 32900 WHERE name = '电钻'").run();
   db.prepare("UPDATE products SET price_cents = NULL WHERE name = '钻头'").run();
   const first = await submit();
+  db.prepare("UPDATE products SET name = '电钻 gsb 570' WHERE name = '电钻'").run();
+  db.prepare("UPDATE products SET name = '钻头 D2', model = ' D2 ' WHERE name = '钻头'").run();
   advance();
   const second = await submit("13900006666");
   const secondPath = `${collection}/${second.orderNo}`;
@@ -222,10 +224,11 @@ test("CSV 按北京时间范围导出订单快照，金额和手机号按 Excel 
   assert.deepEqual([...bytes.slice(0, 3)], [0xef, 0xbb, 0xbf]);
   const csv = new TextDecoder().decode(bytes);
   const snapshots = "电钻 GSB 570 ×1（¥329.00）；钻头 ×2（面议）；锤子 ×3（¥3.00）";
+  const secondSnapshots = "电钻 gsb 570 ×1（¥329.00）；钻头 D2 ×2（面议）；锤子 ×3（¥3.00）";
   const escapedNote = '"客户说""下午"",再送\r\n请联系"';
   assert.equal(csv, [
     columns,
-    `${second.orderNo},2026-11-13 09:00,'=张师傅,"=""13900006666""",送货,店铺仓库,${escapedNote},${snapshots},332.00,0.00,已完成,已收款`,
+    `${second.orderNo},2026-11-13 09:00,'=张师傅,"=""13900006666""",送货,店铺仓库,${escapedNote},${secondSnapshots},332.00,0.00,已完成,已收款`,
     `${first.orderNo},2026-11-13 09:00,张师傅,"=""13812345678""",送货,店铺仓库,下午送达,${snapshots},332.00,,待联系,未收款`,
     "",
   ].join("\r\n"));
