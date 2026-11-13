@@ -1,0 +1,25 @@
+{
+  "name": "@hardware-order/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.ts",
+    "admin:set": "node --env-file-if-exists=.env scripts/set-admin.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.7",
+    "argon2": "0.45.2",
+    "hono": "4.13.18",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3"
+  }
+}
