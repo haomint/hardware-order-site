@@ -7,6 +7,7 @@ import { formatYuan } from "../lib/format.ts";
 import { EmptyNotice, ErrorNotice, toast } from "../components/Feedback.tsx";
 import { CloseIcon, SearchIcon } from "../components/icons.tsx";
 import { OrderExportButton } from "./OrderExport.tsx";
+import { notificationOf } from "./OrderNotification.tsx";
 import { DELIVERY, formatTime, PAYMENT, STATUS, STATUS_ORDER } from "./orderLabels.ts";
 
 const PAGE_SIZE = 20;
@@ -230,7 +231,12 @@ function OrderRow({ order }: { order: Summary }) {
           {order.contactName}
           <span className="tabular ml-2 text-[14px] font-normal text-muted">尾号 {order.phone.slice(-4)}</span>
         </p>
-        <span className={`shrink-0 rounded-md px-2 py-0.5 text-[13px] font-medium ${status.className}`}>{status.label}</span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          {notificationOf(order) === "failed" && (
+            <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[12px] font-medium text-red-700">提醒失败</span>
+          )}
+          <span className={`rounded-md px-2 py-0.5 text-[13px] font-medium ${status.className}`}>{status.label}</span>
+        </span>
       </div>
       <p className="mt-1 line-clamp-2 text-[14px] leading-snug text-ink/80">
         {preview}

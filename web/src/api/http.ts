@@ -188,6 +188,14 @@ export function updateAdminOrder(orderNo: string, patch: UpdateOrder): Promise<O
   return request(`/api/admin/orders/${id(orderNo)}`, json("PATCH", patch));
 }
 
+/** 手动重发新订单提醒。一次点击一个键，网络重试沿用同一个键（阶段 C）。 */
+export function retryAdminNotification(orderNo: string, idempotencyKey: string): Promise<OrderDetail> {
+  return request(`/api/admin/orders/${id(orderNo)}/notifications/retry`, {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+  });
+}
+
 // ── 图片 ──────────────────────────────────────────────
 
 export function uploadImage(file: File): Promise<AdminImage> {

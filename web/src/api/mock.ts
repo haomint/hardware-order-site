@@ -436,16 +436,17 @@ function seedOrder(
     items, address: "浦东新区张江路 88 号 3 号楼", note: "", adminNote: "", cancellationReason: null,
     statusUpdatedAt: createdAt, paymentStatusUpdatedAt: createdAt, adminNoteUpdatedAt: null, finalTotalUpdatedAt: null,
     cancellationReasonUpdatedAt: null,
+    notificationStatus: "sent", notificationLastAttemptAt: createdAt,
     ...extra,
   };
 }
 const P = (n: number) => `9a2d4c6e-1f3b-4d5a-8c7e-${String(n).padStart(12, "0")}`;
 let adminOrders: OrderDetail[] = [
   seedOrder(1, 0.5, "张师傅", "13812345678", "pending_contact", "unpaid", [[P(1), 2], [P(3), 1], [P(7), 3]], { note: "希望明天上午送到" }),
-  seedOrder(2, 5, "李工", "13911112222", "pending_payment", "unpaid", [[P(4), 1]], { deliveryMethod: "pickup", address: null }),
+  seedOrder(2, 5, "李工", "13911112222", "pending_payment", "unpaid", [[P(4), 1]], { deliveryMethod: "pickup", address: null, notificationStatus: "failed" }),
   seedOrder(3, 26, "王老板", "13700003333", "completed", "unpaid", [[P(2), 1], [P(8), 50]], { finalTotalCents: 22800, adminNote: "月结客户，月底一起收" }),
   seedOrder(4, 50, "赵女士", "13655554444", "completed", "paid", [[P(10), 10]], { finalTotalCents: 13900 }),
-  seedOrder(5, 75, "陈先生", "13566667777", "cancelled", "unpaid", [[P(6), 1]], { cancellationReason: "客户已在别处买到" }),
+  seedOrder(5, 75, "陈先生", "13566667777", "cancelled", "unpaid", [[P(6), 1]], { cancellationReason: "客户已在别处买到", notificationStatus: null, notificationLastAttemptAt: null }),
 ];
 
 function inRange(iso: string, from?: string, to?: string) {
@@ -514,9 +515,11 @@ export function createOrder(input: CreateOrder, idempotencyKey: string): Promise
         itemCount: items.length, itemsPreview: items.slice(0, 2).map(({ name, quantity }) => ({ name, quantity })),
         finalTotalCents: null, address, note, adminNote: "", cancellationReason: null,
         statusUpdatedAt: created, paymentStatusUpdatedAt: created, adminNoteUpdatedAt: null, finalTotalUpdatedAt: null, cancellationReasonUpdatedAt: null,
+        notificationStatus: "retrying", notificationLastAttemptAt: null,
       },
       ...adminOrders,
     ];
+    finishMockNotification(receipt.orderNo, "sent");
     return receipt;
   }, 500);
 }
@@ -538,6 +541,7 @@ export function listAdminOrders(query: AdminOrderQuery = {}): Promise<OrderPage>
       orderNo: o.orderNo, createdAt: o.createdAt, updatedAt: o.updatedAt, contactName: o.contactName, phone: o.phone,
       deliveryMethod: o.deliveryMethod, status: o.status, paymentStatus: o.paymentStatus, itemCount: o.itemCount,
       itemsPreview: o.itemsPreview, estimatedTotalCents: o.estimatedTotalCents, finalTotalCents: o.finalTotalCents,
+      notificationStatus: o.notificationStatus,
     }));
     return { items, total: matched.length };
   });
@@ -568,6 +572,37 @@ export function orderExportLink(from: string, to: string): Promise<OrderExportLi
     const last = day(new Date(Date.parse(to) - 1).toISOString());
     return { url: URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" })), filename: `订单_${day(from)}-${last}.csv` };
   });
+}
+
+/** 模拟后台发送一轮提醒：几秒后记录结果。不改订单的 updatedAt。 */
+function finishMockNotification(orderNo: string, result: "sent" | "failed", ms = 4000) {
+  setTimeout(() => {
+    const now = new Date().toISOString();
+    adminOrders = adminOrders.map((o) =>
+      o.orderNo === orderNo && o.notificationStatus === "retrying"
+        ? { ...o, notificationStatus: result, notificationLastAttemptAt: now }
+        : o,
+    );
+  }, ms);
+}
+
+const mockRetryKeys = new Map<string, string>();
+
+/** 按契约：只有 failed 可重发；同一订单同一键重放返回当前详情；其余返回 409。演示时重发总会成功。 */
+export function retryAdminNotification(orderNo: string, idempotencyKey: string): Promise<OrderDetail> {
+  return admin(() => {
+    const order = findOrder(orderNo);
+    const key = idempotencyKey.toLowerCase();
+    if (mockRetryKeys.get(key) === orderNo) return order;
+    if (order.notificationStatus !== "failed") {
+      fail(409, "NOTIFICATION_NOT_RETRYABLE", "只有发送失败且未在处理中的提醒可以重发，请刷新订单查看。");
+    }
+    mockRetryKeys.set(key, orderNo);
+    const updated: OrderDetail = { ...order, notificationStatus: "retrying" };
+    adminOrders = adminOrders.map((o) => (o.orderNo === orderNo ? updated : o));
+    finishMockNotification(orderNo, "sent");
+    return updated;
+  }, 400);
 }
 
 function findOrder(orderNo: string): OrderDetail {
