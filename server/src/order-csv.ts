@@ -38,7 +38,10 @@ function csvRow(cells: readonly string[]) {
 function orderRow(order: OrderDetail) {
   const { year, month, day, hour, minute } = beijingParts(Date.parse(order.createdAt));
   const items = order.items.map(({ name, model, quantity, subtotalCents }) => {
-    const label = model ? `${name} ${model}` : name;
+    const trimmedModel = model.trim();
+    const label = trimmedModel && !name.trim().toLowerCase().includes(trimmedModel.toLowerCase())
+      ? `${name} ${trimmedModel}`
+      : name;
     const subtotal = subtotalCents === null ? "面议" : `¥${money(subtotalCents)}`;
     return `${label} ×${quantity}（${subtotal}）`;
   }).join("；");
