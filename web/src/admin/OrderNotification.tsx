@@ -30,34 +30,46 @@ export function OrderNotification({ order, onChange }: { order: OrderDetail; onC
   const pendingKey = useRef<string | null>(null);
 
   // 处理中时每 3 秒查一次，拿到结果就停，最多查 45 秒。
+  // 截止时间单独计时，不受网络快慢影响；每次查询也有上限，网络卡住时放弃这一次，按时开始下一次。
   useEffect(() => {
     if (status !== "retrying") return;
     setStillSending(false);
     let stopped = false;
-    const started = Date.now();
     let timer = 0;
+    let inFlight: AbortController | null = null;
+    const deadline = window.setTimeout(() => {
+      stopped = true;
+      window.clearTimeout(timer);
+      inFlight?.abort();
+      setStillSending(true);
+    }, TIMING.maxPollingSeconds * 1000);
+
     const poll = async () => {
       if (stopped) return;
-      if (Date.now() - started >= TIMING.maxPollingSeconds * 1000) {
-        setStillSending(true);
-        return;
-      }
+      const controller = new AbortController();
+      inFlight = controller;
+      const limit = window.setTimeout(() => controller.abort(), TIMING.pollIntervalSeconds * 1000);
       try {
-        const latest = await api.getAdminOrder(order.orderNo);
-        if (stopped) return;
-        if (notificationOf(latest) !== "retrying") {
+        const latest = await api.getAdminOrder(order.orderNo, controller.signal);
+        if (!stopped && notificationOf(latest) !== "retrying") {
+          stopped = true;
+          window.clearTimeout(deadline);
           onChange({ notificationStatus: latest.notificationStatus, notificationLastAttemptAt: latest.notificationLastAttemptAt });
           return;
         }
       } catch {
-        // 偶尔查询失败不打扰店主，下一轮再查。
+        // 查询失败或超时不打扰店主，下一次再查。
+      } finally {
+        window.clearTimeout(limit);
       }
-      timer = window.setTimeout(poll, TIMING.pollIntervalSeconds * 1000);
+      if (!stopped) timer = window.setTimeout(poll, TIMING.pollIntervalSeconds * 1000);
     };
     timer = window.setTimeout(poll, TIMING.pollIntervalSeconds * 1000);
     return () => {
       stopped = true;
       window.clearTimeout(timer);
+      window.clearTimeout(deadline);
+      inFlight?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, order.orderNo]);
@@ -74,8 +86,9 @@ export function OrderNotification({ order, onChange }: { order: OrderDetail; onC
       pendingKey.current = null;
       onChange({ notificationStatus: updated.notificationStatus, notificationLastAttemptAt: updated.notificationLastAttemptAt });
     } catch (error) {
-      if (error instanceof ApiError && error.code === "NETWORK_ERROR") {
-        toast(error.message);
+      // 只有后台明确拒绝（4xx/5xx 错误响应）才换新键；其余情况不能断定没受理，再点仍用同一个键。
+      if (!(error instanceof ApiError) || error.status < 400) {
+        toast(error instanceof ApiError ? error.message : "网络不太顺畅，请稍后再试。");
         return;
       }
       pendingKey.current = null;

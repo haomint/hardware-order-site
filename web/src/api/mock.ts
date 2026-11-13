@@ -611,7 +611,8 @@ function findOrder(orderNo: string): OrderDetail {
   return order;
 }
 
-export function getAdminOrder(orderNo: string): Promise<OrderDetail> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function getAdminOrder(orderNo: string, _signal?: AbortSignal): Promise<OrderDetail> {
   return admin(() => findOrder(orderNo));
 }
 
