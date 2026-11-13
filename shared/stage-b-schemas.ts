@@ -27,15 +27,6 @@ export const OrderStatusSchema = z.enum(
 export const PaymentStatusSchema = z.enum(["unpaid", "paid"], "请选择未收款或已收款。")
   .describe("unpaid 为未收款，paid 为已收款。由管理员独立维护。");
 
-type OrderStatus = z.output<typeof OrderStatusSchema>;
-export const orderStatusTransitions = {
-  pending_contact: ["pending_payment", "pending_fulfillment", "cancelled"],
-  pending_payment: ["pending_fulfillment", "cancelled"],
-  pending_fulfillment: ["completed", "cancelled"],
-  completed: [],
-  cancelled: [],
-} as const satisfies Record<OrderStatus, readonly OrderStatus[]>;
-
 const itemCount = (limit: number) => `最多可提交 ${limit} 种商品。`;
 
 export const CartLookupSchema = z.strictObject({
@@ -128,6 +119,9 @@ export const OrderSummarySchema = z.strictObject({
   deliveryMethod: DeliveryMethodSchema,
   status: OrderStatusSchema,
   paymentStatus: PaymentStatusSchema,
+  itemCount: z.int().min(1).max(maxItems).describe("订单快照里的商品种类数，不是数量之和。"),
+  itemsPreview: z.array(OrderItemSnapshotSchema.pick({ name: true, quantity: true }))
+    .min(1).max(2).describe("按下单快照顺序返回前两种商品的名称和数量，不足两种时返回全部。"),
   estimatedTotalCents,
   finalTotalCents: cents.nullable().describe("人工确认的最终金额，未记录时为 null。"),
 });
@@ -137,7 +131,7 @@ export const OrderDetailSchema = OrderSummarySchema.extend({
   address: address.nullable().describe("送货地址。自提时为 null。"),
   note,
   adminNote,
-  cancellationReason: cancellationReason.nullable(),
+  cancellationReason: cancellationReason.nullable().describe("最近一次取消原因，恢复为其他状态后仍保留。"),
   statusUpdatedAt: timestamp,
   paymentStatusUpdatedAt: timestamp,
   adminNoteUpdatedAt: timestamp.nullable(),
@@ -180,7 +174,11 @@ export const OrderPatchSchema = z.strictObject({
   if (patch.status && patch.status !== "cancelled" && patch.cancellationReason !== undefined) {
     ctx.addIssue({ code: "custom", path: ["cancellationReason"], message: "仅已取消的订单可以填写取消原因。" });
   }
-}).meta({ minProperties: 1 });
+}).meta({
+  minProperties: 1,
+  if: { required: ["status"], properties: { status: { const: "cancelled" } } },
+  then: { required: ["cancellationReason"], properties: { cancellationReason: { pattern: "\\S" } } },
+});
 
 export const OrderExportQuerySchema = z.strictObject({ from, to }, objectError).refine(validRange, rangeError);
 export const OrderCsvSchema = z.string().describe("带 BOM 的 UTF-8 CSV，每行一笔订单。");

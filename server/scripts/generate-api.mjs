@@ -31,7 +31,7 @@ function parameters(schema, location) {
 }
 
 function needsOrigin(route) {
-  return route.method !== "get" && route.path.startsWith("/api/admin/");
+  return route.requireOrigin === true || (route.method !== "get" && route.path.startsWith("/api/admin/"));
 }
 
 function errorsFor(route, apiErrors) {
