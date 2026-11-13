@@ -1,1 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800"><rect width="800" height="800" fill="#fff"/><circle cx="400" cy="400" r="300" fill="#f7f3e3"/><g stroke="#4f6779" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" fill="#f7fafc"><path d="M400 200a150 150 0 0 1 90 270v60H310v-60a150 150 0 0 1 90-270z"/><path d="M320 580h160M340 630h120" fill="none"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+<rect width="800" height="800" fill="#ffffff"/>
+<defs><radialGradient id="bg" cx=".5" cy=".45" r=".55"><stop offset="0" stop-color="#fff9e6"/><stop offset="1" stop-color="#ffffff"/></radialGradient></defs>
+<rect width="800" height="800" fill="url(#bg)"/>
+<ellipse cx="400" cy="660" rx="230" ry="26" fill="#0f1b2d" opacity=".06"/>
+<svg x="120" y="110" width="560" height="560" viewBox="0 0 64 64">
+<defs>
+  <linearGradient id="hw-chrome" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#f4f7fb"/><stop offset=".45" stop-color="#c9d2de"/><stop offset="1" stop-color="#8d99aa"/>
+  </linearGradient>
+  <linearGradient id="hw-yellow" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffd84d"/><stop offset="1" stop-color="#f5a300"/>
+  </linearGradient>
+  <linearGradient id="hw-orange" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ff9a3d"/><stop offset="1" stop-color="#f05a12"/>
+  </linearGradient>
+  <linearGradient id="hw-blue" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#4d8bff"/><stop offset="1" stop-color="#1846c8"/>
+  </linearGradient>
+  <linearGradient id="hw-dark" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#474d57"/><stop offset="1" stop-color="#22262c"/>
+  </linearGradient>
+</defs>
+<circle cx="32" cy="27" r="16" fill="#fff8db" stroke="#f5c84b" stroke-width="2"/>
+<path d="M27 30l2.5 6h5L37 30" stroke="#f5a300" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M24 22a9 9 0 0 1 6-6" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+<rect x="25" y="41" width="14" height="12" rx="2.5" fill="url(#hw-chrome)" stroke="#8d99aa" stroke-width=".8"/>
+<path d="M25 45h14M25 49h14" stroke="#8d99aa" stroke-width="1.2"/>
+<rect x="29" y="53" width="6" height="4" rx="1.5" fill="#5b6472"/></svg>
+</svg>

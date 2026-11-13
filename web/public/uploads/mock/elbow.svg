@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+<rect width="800" height="800" fill="#ffffff"/>
+<defs><radialGradient id="bg" cx=".5" cy=".45" r=".55"><stop offset="0" stop-color="#edf3f8"/><stop offset="1" stop-color="#ffffff"/></radialGradient></defs>
+<rect width="800" height="800" fill="url(#bg)"/>
+<ellipse cx="400" cy="660" rx="230" ry="26" fill="#0f1b2d" opacity=".06"/>
+<svg x="120" y="110" width="560" height="560" viewBox="0 0 64 64">
+<defs>
+  <linearGradient id="hw-chrome" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#f4f7fb"/><stop offset=".45" stop-color="#c9d2de"/><stop offset="1" stop-color="#8d99aa"/>
+  </linearGradient>
+  <linearGradient id="hw-yellow" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffd84d"/><stop offset="1" stop-color="#f5a300"/>
+  </linearGradient>
+  <linearGradient id="hw-orange" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ff9a3d"/><stop offset="1" stop-color="#f05a12"/>
+  </linearGradient>
+  <linearGradient id="hw-blue" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#4d8bff"/><stop offset="1" stop-color="#1846c8"/>
+  </linearGradient>
+  <linearGradient id="hw-dark" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#474d57"/><stop offset="1" stop-color="#22262c"/>
+  </linearGradient>
+</defs>
+<path d="M18 52V36a14 14 0 0 1 14-14h16" fill="none" stroke="url(#hw-chrome)" stroke-width="15"/>
+<path d="M18 52V36a14 14 0 0 1 14-14h16" fill="none" stroke="#fff" stroke-width="2.5" opacity=".55" transform="translate(-4 -4)"/>
+<rect x="8.5" y="46" width="19" height="9" rx="2.5" fill="url(#hw-chrome)" stroke="#8d99aa" stroke-width=".8"/>
+<rect x="45" y="12.5" width="9" height="19" rx="2.5" fill="url(#hw-chrome)" stroke="#8d99aa" stroke-width=".8"/>
+<ellipse cx="54" cy="22" rx="2.6" ry="6.5" fill="#6b7685"/></svg>
+</svg>

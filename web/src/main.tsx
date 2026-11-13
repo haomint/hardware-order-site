@@ -6,6 +6,8 @@ import { ShopProvider } from "./lib/shop.tsx";
 import { EmptyNotice, ToastHost } from "./components/Feedback.tsx";
 import { Home } from "./pages/Home.tsx";
 import { ProductDetail } from "./pages/ProductDetail.tsx";
+import { Categories } from "./pages/Categories.tsx";
+import { ContactSheet } from "./components/ContactSheet.tsx";
 
 // 后台按需加载，客户不会下载后台代码。
 const AdminApp = lazy(() => import("./admin/index.tsx"));
@@ -16,6 +18,7 @@ createRoot(document.getElementById("root")!).render(
       <ShopProvider>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/categories" element={<Categories />} />
           <Route path="/p/:id" element={<ProductDetail />} />
           <Route
             path="/admin/*"
@@ -37,6 +40,7 @@ createRoot(document.getElementById("root")!).render(
           />
         </Routes>
         <ToastHost />
+        <ContactSheet />
       </ShopProvider>
     </BrowserRouter>
   </StrictMode>,

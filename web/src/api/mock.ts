@@ -53,7 +53,8 @@ const cat = {
   hand: "6f1c1b7e-0b0a-4a52-9d0e-1a2b3c4d5e02",
   fastener: "6f1c1b7e-0b0a-4a52-9d0e-1a2b3c4d5e03",
   electric: "6f1c1b7e-0b0a-4a52-9d0e-1a2b3c4d5e04",
-  empty: "6f1c1b7e-0b0a-4a52-9d0e-1a2b3c4d5e05",
+  plumbing: "6f1c1b7e-0b0a-4a52-9d0e-1a2b3c4d5e05",
+  empty: "6f1c1b7e-0b0a-4a52-9d0e-1a2b3c4d5e06",
 };
 
 const shop: Shop = {
@@ -67,7 +68,9 @@ let categories: Category[] = [
   { id: cat.hand, name: "手动工具", sortOrder: 2, createdAt: "2026-11-01T02:01:00Z" },
   { id: cat.fastener, name: "紧固件", sortOrder: 3, createdAt: "2026-11-01T02:02:00Z" },
   { id: cat.electric, name: "电工辅料", sortOrder: 4, createdAt: "2026-11-01T02:03:00Z" },
-  { id: cat.empty, name: "水暖管件", sortOrder: 5, createdAt: "2026-11-01T02:04:00Z" },
+  { id: cat.plumbing, name: "水暖管件", sortOrder: 5, createdAt: "2026-11-01T02:04:00Z" },
+  // 没有商品的分类：商城不显示，后台可见。
+  { id: cat.empty, name: "劳保用品", sortOrder: 6, createdAt: "2026-11-01T02:05:00Z" },
 ];
 
 const images = new Map<string, AdminImage>();
@@ -208,6 +211,26 @@ let products: Row[] = [
     unit: "只",
     image: "bulb",
     specifications: "功率：12 W\n灯头：E27 螺口\n色温：6500 K 白光\n电压：220 V",
+  }),
+  seed({
+    name: "不锈钢弯头 内丝 DN20",
+    brand: "",
+    model: "DN20（6 分）",
+    categoryId: cat.plumbing,
+    priceCents: 1280,
+    unit: "个",
+    image: "elbow",
+    specifications: "规格：DN20（3/4 寸，俗称 6 分）\n材质：304 不锈钢\n连接：内丝\n用途：水管 90° 转弯连接",
+  }),
+  seed({
+    name: "五孔插座面板 86 型",
+    brand: "公牛",
+    model: "G07Z223",
+    categoryId: cat.electric,
+    priceCents: 890,
+    unit: "个",
+    image: "socket",
+    specifications: "规格：86 型暗装\n额定：10A 250V\n材质：阻燃 PC\n适用：家装、工程",
   }),
   seed({
     name: "已下架的测试商品",
