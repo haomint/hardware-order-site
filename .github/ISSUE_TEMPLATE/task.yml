@@ -1,0 +1,51 @@
+name: 开发任务
+description: 一件可以在一个 PR 里完成、能逐条验收的事情
+body:
+  - type: markdown
+    attributes:
+      value: |
+        一个 issue 只写一件事。写不清验收标准，说明还需要再拆小。
+  - type: dropdown
+    id: owner
+    attributes:
+      label: 负责方
+      options:
+        - 前端（Claude）
+        - 后端（Codex）
+        - 契约（Codex 起草，Claude 审阅，店主确认）
+        - 店主
+    validations:
+      required: true
+  - type: input
+    id: depends
+    attributes:
+      label: 依赖
+      description: 必须先完成的 issue，例如 #12。没有就写「无」。
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 要做什么
+      description: 用平实的话写清楚范围。
+    validations:
+      required: true
+  - type: textarea
+    id: not
+    attributes:
+      label: 不做什么
+      description: 明确排除的内容，防止范围越做越大。
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 每条都要能实际检查，用「- [ ]」开头。
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: refs
+    attributes:
+      label: 参考
+      description: PRD 章节、接口文档、相关 issue 等。

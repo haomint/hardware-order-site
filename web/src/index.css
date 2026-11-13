@@ -1,0 +1,196 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 设计变量：调整整体风格只改这里。
+   颜色写成「红 绿 蓝」三个数字，方便叠加透明度；括号里是对应的十六进制色值。 */
+:root {
+  --c-brand: 31 90 246; /* 主色：明亮的品牌蓝 (#1f5af6) */
+  --c-brand-dark: 21 70 200; /* (#1546c8) */
+  --c-brand-soft: 234 241 255; /* (#eaf1ff) */
+  --c-accent: 255 107 26; /* 强调色：只用于价格和「加入购物车」「提交订货单」等主要操作 (#ff6b1a) */
+  --c-accent-dark: 234 88 12; /* (#ea580c) */
+  --c-ink: 15 27 45; /* 正文 (#0f1b2d) */
+  --c-muted: 91 107 128; /* 次要文字 (#5b6b80) */
+  --c-faint: 148 163 184; /* 提示文字 (#94a3b8) */
+  --c-line: 230 235 242; /* 分隔线 (#e6ebf2) */
+  --c-page: 244 246 250; /* 页面底色 (#f4f6fa) */
+  --c-surface: 255 255 255; /* 卡片底色 (#ffffff) */
+  --r-card: 16px;
+  --r-control: 12px;
+
+  /* 底部导航高度（不含苹果手机底部横条的安全区）。 */
+  --tabbar-h: 60px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh; /* 安卓和 iOS 地址栏伸缩时不跳动；旧浏览器用上一行 */
+    background: rgb(var(--c-page));
+    color: rgb(var(--c-ink));
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "MiSans",
+      "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  /* 去掉手机上点击后约 300 毫秒的延迟，并禁止双击放大误触。 */
+  a,
+  button,
+  input,
+  label,
+  select,
+  textarea,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+  /* iOS 上输入框字号小于 16px 会触发页面自动放大。 */
+  input,
+  button,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+  img {
+    -webkit-user-drag: none;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-brand));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* 正方形容器。用 padding 撑高度，iOS 14 及以下不支持 aspect-ratio 也能正常显示。
+     只有直接子元素里的图片和 .ratio-fill 会铺满整个方块，其他子元素（按钮等）保持自己的定位。 */
+  .ratio-square {
+    position: relative;
+    width: 100%;
+  }
+  .ratio-square::before {
+    content: "";
+    display: block;
+    padding-top: 100%;
+  }
+  .ratio-square > img,
+  .ratio-square > .ratio-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .bg-brand-gradient {
+    background-color: rgb(var(--c-brand));
+    background-image: linear-gradient(135deg, #3d7bff 0%, #1f5af6 45%, #1640c4 100%);
+  }
+  .bg-accent-gradient {
+    background-color: rgb(var(--c-accent));
+    background-image: linear-gradient(135deg, #ff9a3d 0%, #ff6b1a 55%, #f4511e 100%);
+  }
+  .bg-accent-gradient:active {
+    background-image: linear-gradient(135deg, #f08a2e 0%, #ea580c 100%);
+  }
+}
+
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .pb-safe {
+    padding-bottom: var(--safe-bottom);
+  }
+  .pt-safe {
+    padding-top: var(--safe-top);
+  }
+  /* 页面底部留出底部导航的位置。 */
+  .pb-tabbar {
+    padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 16px);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.55;
+  }
+}
+.skeleton {
+  background: #e6ebf2;
+  border-radius: 8px;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-sheet {
+  animation: sheet-up 0.22s ease-out;
+}
+.animate-fade {
+  animation: fade-in 0.18s ease-out;
+}
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-pop {
+  animation: pop 0.3s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .animate-sheet,
+  .animate-fade,
+  .animate-pop {
+    animation: none;
+  }
+}

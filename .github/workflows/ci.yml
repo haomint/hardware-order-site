@@ -1,0 +1,70 @@
+name: 检查
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# 分成三项，哪一项失败就是哪一部分出了问题。
+jobs:
+  shared:
+    name: 契约
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: 安装依赖
+        run: npm --prefix shared ci
+      - name: 类型检查
+        run: npm --prefix shared run typecheck
+      - name: 接口文档与契约代码一致
+        run: npm --prefix shared run docs:check
+
+  web:
+    name: 前端
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # 前端引用 shared/ 里的类型，需要先装契约的依赖。
+      - name: 安装契约依赖
+        run: npm --prefix shared ci
+      - name: 安装依赖
+        run: npm --prefix web ci
+      - name: 类型检查与正式构建
+        run: npm --prefix web run build
+
+  server:
+    name: 后端
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: 后端代码尚未合并时跳过
+        if: hashFiles('server/package-lock.json') == ''
+        run: echo "server/package-lock.json 不存在，后端检查跳过。"
+      - name: 安装契约依赖
+        if: hashFiles('server/package-lock.json') != ''
+        run: npm --prefix shared ci
+      - name: 安装依赖
+        if: hashFiles('server/package-lock.json') != ''
+        run: npm --prefix server ci
+      - name: 类型检查
+        if: hashFiles('server/package-lock.json') != ''
+        run: npm --prefix server run typecheck
+      - name: 自动化测试
+        if: hashFiles('server/package-lock.json') != ''
+        run: npm --prefix server test
