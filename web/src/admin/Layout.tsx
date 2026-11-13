@@ -37,15 +37,16 @@ export function AdminLayout() {
           </div>
         </div>
         <nav className="flex border-t border-line" aria-label="后台导航">
+          <NavLink to="/admin/orders" className={tab}>
+            订单
+          </NavLink>
           <NavLink to="/admin/products" className={tab}>
             商品
           </NavLink>
           <NavLink to="/admin/categories" className={tab}>
             分类
           </NavLink>
-          <span className="flex min-h-tap flex-1 items-center justify-center text-base text-faint" title="阶段 B 开放">
-            订单
-          </span>
+
         </nav>
       </header>
 

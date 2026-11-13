@@ -8,6 +8,10 @@ import type {
   Category,
   CreateOrder,
   OrderReceipt,
+  AdminOrderQuery,
+  OrderDetail,
+  OrderPage,
+  UpdateOrder,
   CategoryInput,
   CategoryPatch,
   CreateProduct,
@@ -159,6 +163,20 @@ export function updateProduct(productId: string, patch: UpdateProduct): Promise<
 
 export function deleteProduct(productId: string): Promise<void> {
   return request(`/api/admin/products/${id(productId)}`, { method: "DELETE" });
+}
+
+// ── 后台订单（阶段 B） ─────────────────────────────────
+
+export function listAdminOrders(query: AdminOrderQuery = {}): Promise<OrderPage> {
+  return request(`/api/admin/orders${toSearch(query)}`);
+}
+
+export function getAdminOrder(orderNo: string): Promise<OrderDetail> {
+  return request(`/api/admin/orders/${id(orderNo)}`);
+}
+
+export function updateAdminOrder(orderNo: string, patch: UpdateOrder): Promise<OrderDetail> {
+  return request(`/api/admin/orders/${id(orderNo)}`, json("PATCH", patch));
 }
 
 // ── 图片 ──────────────────────────────────────────────
