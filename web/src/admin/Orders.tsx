@@ -6,6 +6,7 @@ import { useAsync } from "../lib/useAsync.ts";
 import { formatYuan } from "../lib/format.ts";
 import { EmptyNotice, ErrorNotice, toast } from "../components/Feedback.tsx";
 import { CloseIcon, SearchIcon } from "../components/icons.tsx";
+import { OrderExportButton } from "./OrderExport.tsx";
 import { DELIVERY, formatTime, PAYMENT, STATUS, STATUS_ORDER } from "./orderLabels.ts";
 
 const PAGE_SIZE = 20;
@@ -143,17 +144,22 @@ export function Orders() {
         ))}
       </div>
 
-      {filter !== "unpaid_done" && (
-        <label className="mt-2 flex min-h-tap w-fit cursor-pointer items-center gap-2 text-[15px] text-ink">
-          <input
-            type="checkbox"
-            checked={unpaidOnly}
-            onChange={(event) => setQuery({ unpaid: event.target.checked })}
-            className="h-5 w-5 accent-[rgb(var(--c-brand))]"
-          />
-          只看未收款
-        </label>
-      )}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        {filter !== "unpaid_done" ? (
+          <label className="flex min-h-tap w-fit cursor-pointer items-center gap-2 text-[15px] text-ink">
+            <input
+              type="checkbox"
+              checked={unpaidOnly}
+              onChange={(event) => setQuery({ unpaid: event.target.checked })}
+              className="h-5 w-5 accent-[rgb(var(--c-brand))]"
+            />
+            只看未收款
+          </label>
+        ) : (
+          <span />
+        )}
+        <OrderExportButton />
+      </div>
 
       <div className="mt-2">
         {first.state.status === "error" ? (

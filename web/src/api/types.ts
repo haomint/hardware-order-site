@@ -21,6 +21,9 @@ export type {
 export type OrderStatus = "pending_contact" | "pending_payment" | "pending_fulfillment" | "completed" | "cancelled";
 export type PaymentStatus = "unpaid" | "paid";
 
+/** 订单导出的下载链接。filename 仅在浏览器内生成文件时提供。 */
+export type OrderExportLink = { url: string; filename?: string };
+
 /** 对应契约的 AdminOrderQuerySchema：URL 查询参数都是字符串。 */
 export type AdminOrderQuery = {
   status?: OrderStatus;
