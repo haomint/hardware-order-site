@@ -3,13 +3,13 @@ import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/index.ts";
 import type { ProductDetail as Product } from "../api/index.ts";
-import { addToCart, MAX_QUANTITY } from "../lib/cart.ts";
+import { addToCart, MAX_LINES, MAX_QUANTITY } from "../lib/cart.ts";
 import { useShop } from "../lib/shop.tsx";
 import { useAsync } from "../lib/useAsync.ts";
 import { Price } from "../components/Price.tsx";
 import { EmptyNotice, ErrorNotice, toast } from "../components/Feedback.tsx";
 import { openContact } from "../components/ContactSheet.tsx";
-import { CartBadge, openCart } from "../components/TabBar.tsx";
+import { CartBadge } from "../components/TabBar.tsx";
 import { BackIcon, CartIcon, HeadsetIcon, HomeIcon, MinusIcon, PlusIcon } from "../components/icons.tsx";
 
 export function ProductDetail() {
@@ -64,10 +64,10 @@ function FloatingTopBar() {
         <button type="button" onClick={goBack} aria-label="返回" className={`pointer-events-auto ${circle}`}>
           <BackIcon size={22} />
         </button>
-        <button type="button" onClick={openCart} aria-label="购物车" className={`pointer-events-auto relative ${circle}`}>
+        <Link to="/cart" aria-label="购物车" className={`pointer-events-auto relative ${circle}`}>
           <CartIcon size={21} />
           <CartBadge className="-right-1 -top-1" />
-        </button>
+        </Link>
       </div>
     </div>
   );
@@ -135,7 +135,7 @@ function DetailBody({ product }: { product: Product }) {
         <IconAction to="/" label="首页" icon={<HomeIcon size={22} strokeWidth={1.8} />} />
         <IconAction onClick={openContact} label="联系" icon={<HeadsetIcon size={22} strokeWidth={1.8} />} />
         <IconAction
-          onClick={openCart}
+          to="/cart"
           label="购物车"
           icon={
             <span className="relative">
@@ -156,7 +156,10 @@ function DetailBody({ product }: { product: Product }) {
           <button
             type="button"
             onClick={() => {
-              addToCart(product.id, quantity);
+              if (addToCart(product, quantity) === "full") {
+                toast(`购物车最多 ${MAX_LINES} 种商品，请先提交或移除一些`);
+                return;
+              }
               toast(`已加入购物车：${quantity} ${product.unit}`);
               setQuantity(1);
             }}

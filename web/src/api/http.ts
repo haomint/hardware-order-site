@@ -4,6 +4,7 @@ import type {
   AdminProduct,
   AdminProductQuery,
   AdminSession,
+  CartLookupResult,
   Category,
   CategoryInput,
   CategoryPatch,
@@ -81,6 +82,13 @@ export function listProducts(query: ProductQuery = {}): Promise<ListResult<Produ
 
 export function getProduct(productId: string): Promise<ProductDetail> {
   return request(`/api/products/${id(productId)}`);
+}
+
+// ── 购物车与订货（阶段 B） ─────────────────────────────
+
+/** 按商品编号批量查询购物车商品的当前价格和可订状态（最多 100 个）。 */
+export function lookupCart(productIds: string[]): Promise<CartLookupResult> {
+  return request("/api/cart/items", json("POST", { productIds }));
 }
 
 // ── 管理员会话 ────────────────────────────────────────
