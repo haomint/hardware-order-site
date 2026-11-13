@@ -1,0 +1,9 @@
+# 仓库内文本文件统一用 LF 换行，避免 Windows 和 Linux 之间来回转换产生无意义的改动。
+* text=auto eol=lf
+
+*.docx binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
