@@ -6,12 +6,14 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { getCookie, setCookie } from "hono/cookie";
 import { cors } from "hono/cors";
-import { AdminSessionCookieName, ApiErrorSchema, apiErrors, stageA, stageB } from "../../shared/index.ts";
+import {
+  AdminSessionCookieName, ApiErrorSchema, StageCApiErrorSchema, stageA, stageB, stageC,
+} from "../../shared/index.ts";
 import { createAuth } from "./auth.ts";
 import { createAdminOrders } from "./admin-orders.ts";
 import { createCatalog } from "./catalog.ts";
 import type { Config } from "./config.ts";
-import { ApiFailure, OrderFailure, validate, type Schema } from "./errors.ts";
+import { ApiFailure, OrderFailure, requestErrors, validate, type Schema } from "./errors.ts";
 import { createImages } from "./images.ts";
 import { createOrders, createOrderSubmissionLimiter } from "./orders.ts";
 import { orderCsvDisposition, streamOrderCsv } from "./order-csv.ts";
@@ -51,7 +53,7 @@ type Route = {
   query?: Schema;
   headers?: Schema;
   body?: { schema: Schema; mediaType?: "multipart/form-data" };
-  success: { status: 200 | 201 | 204; schema?: Schema };
+  success: { status: 200 | 201 | 202 | 204; schema?: Schema };
 };
 
 type Parse<T> = T extends Schema<infer Result> ? Result : undefined;
@@ -64,8 +66,9 @@ type Input<R extends Route> = {
 
 function errorResponse(c: ApiContext, error: ApiFailure) {
   const { code, message, fieldErrors } = error;
-  return c.json(ApiErrorSchema.parse(fieldErrors ? { code, message, fieldErrors } : { code, message }),
-    apiErrors[code].status);
+  const schema = code === "NOTIFICATION_NOT_RETRYABLE" ? StageCApiErrorSchema : ApiErrorSchema;
+  return c.json(schema.parse(fieldErrors ? { code, message, fieldErrors } : { code, message }),
+    requestErrors[code].status);
 }
 
 function singleValues(entries: Iterable<[string, unknown]>) {
@@ -88,6 +91,21 @@ async function readBody(c: ApiContext, multipart: boolean): Promise<unknown> {
   } catch (error) {
     if (error instanceof ApiFailure) throw error;
     throw new ApiFailure("INVALID_REQUEST");
+  }
+}
+
+async function requireEmptyBody(c: ApiContext) {
+  const body = c.req.raw.body;
+  if (!body) return;
+  const reader = body.getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      if (value.byteLength) throw new ApiFailure("INVALID_REQUEST", { body: "重发提醒无需提交请求正文。" });
+    }
+  } finally {
+    reader.releaseLock();
   }
 }
 
@@ -219,7 +237,10 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now, weco
     }
     return receipt;
   }, (c) => limitOrderSubmission(visitorIp(c, config.trustProxy)));
-  add(stageB.listAdminOrders, ({ query }) => adminOrders.list(query));
+  add(stageC.listAdminOrders, ({ query }) => {
+    notifications.expireManual();
+    return adminOrders.list(query);
+  });
   add(stageB.exportAdminOrders, ({ query }, c) => {
     const { status, mediaType } = stageB.exportAdminOrders.success;
     const headers = {
@@ -229,8 +250,21 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now, weco
     const body = c.req.raw.method === "HEAD" ? null : streamOrderCsv(adminOrders.exportRange(query));
     return new Response(body, { status, headers });
   });
-  add(stageB.getAdminOrder, ({ params }) => adminOrders.get(params.orderNo));
-  add(stageB.updateAdminOrder, ({ params, body }) => adminOrders.update(params.orderNo, body));
+  add(stageC.getAdminOrder, ({ params }) => {
+    notifications.expireManual();
+    return adminOrders.get(params.orderNo);
+  });
+  add(stageC.updateAdminOrder, ({ params, body }) => {
+    notifications.expireManual();
+    return adminOrders.update(params.orderNo, body);
+  });
+  add(stageC.retryAdminNotification, async ({ params, headers }, c) => {
+    await requireEmptyBody(c);
+    notifications.expireManual();
+    const { orderNo } = params;
+    notifications.retry(orderNo, headers["Idempotency-Key"]);
+    return adminOrders.get(orderNo);
+  });
 
   add(stageA.login, async ({ body }, c) => {
     const session = await auth.login(body, visitorIp(c, config.trustProxy), getCookie(c, AdminSessionCookieName));
