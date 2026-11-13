@@ -1,0 +1,38 @@
+name: 问题反馈
+description: 发现哪里不对：页面显示错误、操作失败、和需求不一致
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 看到了什么？可以附截图。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 怎么复现
+      description: 一步步写下操作过程。
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 应该是什么样
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: 在哪里发现的
+      description: 例如：苹果手机微信里 / 安卓手机浏览器 / 电脑 Chrome；正式网站还是本地开发环境。
+  - type: input
+    id: issue
+    attributes:
+      label: 相关 issue
+      description: 和哪个 issue 的功能有关，例如 #12。
