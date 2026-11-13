@@ -6,12 +6,13 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { getCookie, setCookie } from "hono/cookie";
 import { cors } from "hono/cors";
-import { AdminSessionCookieName, ApiErrorSchema, apiErrors, stageA } from "../../shared/index.ts";
+import { AdminSessionCookieName, ApiErrorSchema, apiErrors, stageA, stageB } from "../../shared/index.ts";
 import { createAuth } from "./auth.ts";
 import { createCatalog } from "./catalog.ts";
 import type { Config } from "./config.ts";
-import { ApiFailure, validate, type Schema } from "./errors.ts";
+import { ApiFailure, OrderFailure, validate, type Schema } from "./errors.ts";
 import { createImages } from "./images.ts";
+import { createOrders, createOrderSubmissionLimiter } from "./orders.ts";
 
 type NodeConnection = { incoming: IncomingMessage };
 type HttpEnv = {
@@ -45,6 +46,7 @@ type Route = {
   admin?: boolean;
   params?: Schema;
   query?: Schema;
+  headers?: Schema;
   body?: { schema: Schema; mediaType?: "multipart/form-data" };
   success: { status: 200 | 201 | 204; schema?: Schema };
 };
@@ -53,6 +55,7 @@ type Parse<T> = T extends Schema<infer Result> ? Result : undefined;
 type Input<R extends Route> = {
   params: Parse<R["params"]>;
   query: Parse<R["query"]>;
+  headers: Parse<R["headers"]>;
   body: R["body"] extends { schema: infer Body } ? Parse<Body> : undefined;
 };
 
@@ -110,6 +113,8 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
   const app = new Hono<HttpEnv>();
   const auth = createAuth(db, now);
   const catalog = createCatalog(db, now);
+  const orders = createOrders(db, catalog.findPublicItem, now);
+  const limitOrderSubmission = createOrderSubmissionLimiter(now);
   const images = createImages(db, config.uploadDir, now);
   const queueUpload = uploadQueue();
 
@@ -125,6 +130,7 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
 
   app.onError((error, c) => {
     if (error instanceof ApiFailure) return errorResponse(c, error);
+    if (error instanceof OrderFailure) return c.json(error.response, error.status);
     console.error("接口处理失败。", c.req.method, c.req.path, error);
     return errorResponse(c, new ApiFailure("INTERNAL_ERROR"));
   });
@@ -137,13 +143,15 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
       origin: (origin) => config.developmentOrigins.has(origin) ? origin : undefined,
       credentials: true,
       allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type"],
+      allowHeaders: ["Content-Type", "Idempotency-Key"],
     }));
   }
 
   function add<R extends Route>(
     definition: R,
-    handler: (input: Input<R>, c: ApiContext) => Parse<R["success"]["schema"]> | Promise<Parse<R["success"]["schema"]>>,
+    handler: (input: Input<R>, c: ApiContext) => Parse<R["success"]["schema"]> | Response
+      | Promise<Parse<R["success"]["schema"]> | Response>,
+    beforeValidation?: (c: ApiContext) => void,
   ) {
     const route: Route = definition;
     const multipart = route.body?.mediaType === "multipart/form-data";
@@ -158,6 +166,7 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
           throw new ApiFailure("INVALID_ORIGIN");
         }
       }
+      beforeValidation?.(c);
       await next();
       if (session && token && c.res.ok) {
         const expiry = auth.renew(session);
@@ -179,9 +188,13 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
       const inputs = {
         params: route.params ? validate(route.params, c.req.param()) : undefined,
         query: route.query ? validate(route.query, singleValues(new URL(c.req.url).searchParams)) : undefined,
+        headers: route.headers ? validate(route.headers, {
+          "Idempotency-Key": c.req.header("Idempotency-Key"),
+        }) : undefined,
         body: route.body ? validate(route.body.schema, await readBody(c, multipart)) : undefined,
       } as Input<R>;
       const value = await handler(inputs, c);
+      if (value instanceof Response) return value;
       if (route.success.status === 204) return c.body(null, 204);
       return c.json(route.success.schema?.parse(value), route.success.status);
     });
@@ -191,6 +204,15 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
   add(stageA.listCategories, () => catalog.listCategories(false));
   add(stageA.listProducts, ({ query }) => catalog.listProducts(query));
   add(stageA.getProduct, ({ params }) => catalog.getProduct(params.id.toLowerCase()));
+  add(stageB.lookupCart, ({ body }) => orders.lookupCart(body.productIds));
+  add(stageB.createOrder, ({ body, headers }, c) => {
+    const { receipt, replayed } = orders.submit(body, headers["Idempotency-Key"]);
+    if (replayed) {
+      const [response] = stageB.createOrder.additionalSuccess;
+      return c.json(response.schema.parse(receipt), response.status);
+    }
+    return receipt;
+  }, (c) => limitOrderSubmission(visitorIp(c, config.trustProxy)));
 
   add(stageA.login, async ({ body }, c) => {
     const session = await auth.login(body, visitorIp(c, config.trustProxy), getCookie(c, AdminSessionCookieName));

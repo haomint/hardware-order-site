@@ -126,6 +126,11 @@ export function createCatalog(db: DatabaseSync, now: () => number) {
     return row;
   }
 
+  function findPublicItem(id: string) {
+    const row = productById.get(id.toLowerCase()) as ProductRow | undefined;
+    return row?.is_published ? publicItem(row) : undefined;
+  }
+
   function details(id: string) {
     return (productImages.all(id) as { image_id: string }[]).map(({ image_id }) => image_id);
   }
@@ -221,6 +226,7 @@ export function createCatalog(db: DatabaseSync, now: () => number) {
       const row = getRow(id, false);
       return { ...publicItem(row), specifications: row.specifications, detailImages: details(id).map(imagePaths) };
     },
+    findPublicItem,
     getAdminProduct(id: string) {
       return adminProduct(getRow(id, true));
     },

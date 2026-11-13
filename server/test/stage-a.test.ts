@@ -318,7 +318,7 @@ test("目录、图片和上下架在公开与后台接口中一致", async (t) =
   assert.deepEqual(readdirSync(uploadDir), []);
   const reopened = openDatabase(dbPath);
   try {
-    assert.equal(reopened.prepare("SELECT COUNT(*) AS total FROM schema_migrations").get()?.total, 1);
+    assert.ok(reopened.prepare("SELECT version FROM schema_migrations WHERE version = 1").get());
     assert.equal(reopened.prepare("SELECT name FROM categories WHERE id = ?").get(parts.id)?.name, "零配件");
   } finally {
     reopened.close();
