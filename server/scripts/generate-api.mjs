@@ -11,6 +11,10 @@ import {
   stageBInfo,
   stageBErrors,
   StageBApiErrorSchema,
+  stageC,
+  stageCInfo,
+  stageCErrors,
+  StageCApiErrorSchema,
 } from "../../shared/index.ts";
 
 function openApiSchema(schema, io) {
@@ -183,6 +187,7 @@ const check = process.argv.includes("--check");
 const outputs = [
   ...generateStage("stage-a", stageAInfo, stageA, apiErrors, ApiErrorSchema),
   ...generateStage("stage-b", stageBInfo, stageB, stageBErrors, StageBApiErrorSchema),
+  ...generateStage("stage-c", stageCInfo, stageC, stageCErrors, StageCApiErrorSchema),
 ];
 for (const [file, content] of outputs) {
   const target = new URL(`../../docs/api/${file}`, import.meta.url);

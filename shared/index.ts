@@ -1,5 +1,6 @@
 export * from "./stage-a-schemas.ts";
 export * from "./stage-b-schemas.ts";
+export * from "./stage-c.ts";
 export {
   stageB,
   stageBInfo,

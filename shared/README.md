@@ -22,6 +22,12 @@
 - [请求与响应模型](./stage-b-schemas.ts)
 - [路由、成功状态和错误码](./stage-b.ts)
 
+## 阶段 C 提醒契约草案
+
+- [接口一览与行为约定](../docs/api/stage-c.md)
+- [OpenAPI 完整定义](../docs/api/stage-c.openapi.json)
+- [请求与响应模型、路由和错误码](./stage-c.ts)
+
 ## 本地验证
 
 使用 Node.js 24 或更高版本，在仓库根目录运行：
