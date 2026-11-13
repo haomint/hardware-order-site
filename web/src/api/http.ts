@@ -9,6 +9,7 @@ import type {
   CreateOrder,
   OrderReceipt,
   AdminOrderQuery,
+  OrderExportLink,
   OrderDetail,
   OrderPage,
   UpdateOrder,
@@ -169,6 +170,14 @@ export function deleteProduct(productId: string): Promise<void> {
 
 export function listAdminOrders(query: AdminOrderQuery = {}): Promise<OrderPage> {
   return request(`/api/admin/orders${toSearch(query)}`);
+}
+
+/**
+ * 导出地址。用普通链接打开，由浏览器按服务器给的文件名下载；
+ * 这种方式在手机浏览器里兼容性最好（比先下载到内存再保存稳定）。
+ */
+export async function orderExportLink(from: string, to: string): Promise<OrderExportLink> {
+  return { url: `/api/admin/orders/export${toSearch({ from, to })}` };
 }
 
 export function getAdminOrder(orderNo: string): Promise<OrderDetail> {

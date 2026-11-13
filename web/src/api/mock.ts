@@ -23,6 +23,7 @@ import type {
   CreateOrder,
   OrderReceipt,
   AdminOrderQuery,
+  OrderExportLink,
   OrderDetail,
   OrderPage,
   UpdateOrder,
@@ -539,6 +540,33 @@ export function listAdminOrders(query: AdminOrderQuery = {}): Promise<OrderPage>
       itemsPreview: o.itemsPreview, estimatedTotalCents: o.estimatedTotalCents, finalTotalCents: o.finalTotalCents,
     }));
     return { items, total: matched.length };
+  });
+}
+
+/** 演示用 CSV：列和格式尽量与契约一致，正式文件由后端生成。 */
+export function orderExportLink(from: string, to: string): Promise<OrderExportLink> {
+  return admin(() => {
+    const yuan = (cents: number | null) => (cents === null ? "" : (cents / 100).toFixed(2));
+    const cell = (value: string) => (/[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+    const time = (iso: string) => new Date(iso).toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" }).slice(0, 16);
+    const labels = {
+      delivery: { delivery: "送货", pickup: "到店自提" },
+      status: { pending_contact: "待联系", pending_payment: "待收款", pending_fulfillment: "待履约", completed: "已完成", cancelled: "已取消" },
+      payment: { unpaid: "未收款", paid: "已收款" },
+    } as const;
+    const rows = adminOrders
+      .filter((o) => inRange(o.createdAt, from, to))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((o) => [
+        o.orderNo, time(o.createdAt), o.contactName, `="${o.phone}"`, labels.delivery[o.deliveryMethod], o.address ?? "", o.note,
+        o.items.map((i) => `${i.name}${i.model ? " " + i.model : ""} ×${i.quantity}（${i.subtotalCents === null ? "面议" : "¥" + yuan(i.subtotalCents)}）`).join("；"),
+        yuan(o.estimatedTotalCents), yuan(o.finalTotalCents), labels.status[o.status], labels.payment[o.paymentStatus],
+      ]);
+    const header = ["订单号", "下单时间", "联系人", "手机号", "配送方式", "收货地址", "备注", "商品明细", "预估商品金额（元）", "最终确认金额（元）", "订单状态", "收款状态"];
+    const text = "﻿" + [header, ...rows].map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
+    const day = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" }).replace(/-/g, "");
+    const last = day(new Date(Date.parse(to) - 1).toISOString());
+    return { url: URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" })), filename: `订单_${day(from)}-${last}.csv` };
   });
 }
 
