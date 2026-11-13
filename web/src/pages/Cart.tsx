@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/index.ts";
 import type { CartLookupResult } from "../api/index.ts";
 import {
@@ -14,7 +14,7 @@ import {
 import type { CartLine } from "../lib/cart.ts";
 import { brandModel, formatYuan } from "../lib/format.ts";
 import { useShop } from "../lib/shop.tsx";
-import { ErrorNotice, toast } from "../components/Feedback.tsx";
+import { ErrorNotice } from "../components/Feedback.tsx";
 import { TabBar } from "../components/TabBar.tsx";
 import { CartIcon, CloseIcon, MinusIcon, PlusIcon } from "../components/icons.tsx";
 
@@ -26,6 +26,7 @@ const UNDO_MS = 5000;
 
 export function Cart() {
   const shop = useShop();
+  const navigate = useNavigate();
   const lines = useCart();
   const [info, setInfo] = useState<Map<string, LookupItem>>(new Map());
   const [error, setError] = useState("");
@@ -209,7 +210,7 @@ export function Cart() {
               <button
                 type="button"
                 disabled={!canSubmit}
-                onClick={() => toast("提交订货单页面将在下一步开放")}
+                onClick={() => navigate("/checkout")}
                 className="bg-accent-gradient h-12 shrink-0 rounded-full px-6 text-[16px] font-bold text-white shadow-accent disabled:bg-none disabled:bg-line disabled:text-faint disabled:shadow-none"
               >
                 去提交订货单

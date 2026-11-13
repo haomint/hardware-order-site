@@ -20,6 +20,14 @@ import type {
   AdminSession,
   CartLookupResult,
   Category,
+  CreateOrder,
+  OrderReceipt,
+  AdminOrderQuery,
+  OrderExportLink,
+  OrderDetail,
+  OrderPage,
+  UpdateOrder,
+  UnavailableItem,
   CategoryInput,
   CategoryPatch,
   CreateProduct,
@@ -395,6 +403,214 @@ export function lookupCart(productIds: string[]): Promise<CartLookupResult> {
       }),
     };
   }, 220);
+}
+
+const mockOrders = new Map<string, { digest: string; receipt: OrderReceipt }>();
+let mockOrderSeq = 0;
+
+/** 后台演示订单：覆盖各种状态，其中一笔「已完成但未收款」。 */
+function seedOrder(
+  no: number,
+  hoursAgo: number,
+  contactName: string,
+  phone: string,
+  status: OrderDetail["status"],
+  paymentStatus: OrderDetail["paymentStatus"],
+  lines: [string, number][],
+  extra: Partial<OrderDetail> = {},
+): OrderDetail {
+  const createdAt = new Date(Date.now() - hoursAgo * 3600e3).toISOString();
+  const items = lines.map(([productId, quantity]) => {
+    const row = products.find((p) => p.id === productId)!;
+    return {
+      productId, name: row.name, brand: row.brand, model: row.model, unit: row.unit, unitPriceCents: row.priceCents, quantity,
+      subtotalCents: row.priceCents === null ? null : row.priceCents * quantity,
+    };
+  });
+  const ymd = new Date(createdAt).toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" }).replace(/-/g, "");
+  return {
+    orderNo: `WJ-${ymd}-${String(9000 + no)}`, createdAt, updatedAt: createdAt, contactName, phone,
+    deliveryMethod: "delivery", status, paymentStatus, itemCount: items.length,
+    itemsPreview: items.slice(0, 2).map(({ name, quantity }) => ({ name, quantity })),
+    estimatedTotalCents: items.reduce((sum, i) => sum + (i.subtotalCents ?? 0), 0), finalTotalCents: null,
+    items, address: "浦东新区张江路 88 号 3 号楼", note: "", adminNote: "", cancellationReason: null,
+    statusUpdatedAt: createdAt, paymentStatusUpdatedAt: createdAt, adminNoteUpdatedAt: null, finalTotalUpdatedAt: null,
+    cancellationReasonUpdatedAt: null,
+    ...extra,
+  };
+}
+const P = (n: number) => `9a2d4c6e-1f3b-4d5a-8c7e-${String(n).padStart(12, "0")}`;
+let adminOrders: OrderDetail[] = [
+  seedOrder(1, 0.5, "张师傅", "13812345678", "pending_contact", "unpaid", [[P(1), 2], [P(3), 1], [P(7), 3]], { note: "希望明天上午送到" }),
+  seedOrder(2, 5, "李工", "13911112222", "pending_payment", "unpaid", [[P(4), 1]], { deliveryMethod: "pickup", address: null }),
+  seedOrder(3, 26, "王老板", "13700003333", "completed", "unpaid", [[P(2), 1], [P(8), 50]], { finalTotalCents: 22800, adminNote: "月结客户，月底一起收" }),
+  seedOrder(4, 50, "赵女士", "13655554444", "completed", "paid", [[P(10), 10]], { finalTotalCents: 13900 }),
+  seedOrder(5, 75, "陈先生", "13566667777", "cancelled", "unpaid", [[P(6), 1]], { cancellationReason: "客户已在别处买到" }),
+];
+
+function inRange(iso: string, from?: string, to?: string) {
+  const t = Date.parse(iso);
+  return (!from || t >= Date.parse(from)) && (!to || t < Date.parse(to));
+}
+
+/** 按契约模拟：字段校验、缺货整单拒绝、同一个键重放返回原回执、内容不同返回冲突。 */
+export function createOrder(input: CreateOrder, idempotencyKey: string): Promise<OrderReceipt> {
+  return respond(() => {
+    const contactName = input.contactName.trim();
+    const phone = input.phone.trim();
+    const address = input.deliveryMethod === "pickup" ? null : (input.address ?? "").trim();
+    const note = (input.note ?? "").trim();
+    const errors: Record<string, string> = {};
+    if (contactName.length < 2) errors.contactName = "联系人姓名至少 2 个字符。";
+    if (contactName.length > 30) errors.contactName = "联系人姓名不能超过 30 个字符。";
+    if (!/^1[3-9][0-9]{9}$/.test(phone)) errors.phone = "请填写有效的 11 位中国大陆手机号。";
+    if (input.deliveryMethod === "delivery" && !address) errors.address = "送货时请填写收货地址。";
+    if (address && address.length > 200) errors.address = "收货地址不能超过 200 个字符。";
+    if (note.length > 300) errors.note = "备注不能超过 300 个字符。";
+    if (input.items.length === 0) errors.items = "请至少选择一种商品。";
+    if (Object.keys(errors).length) fail(400, "INVALID_REQUEST", "请检查填写的内容后重试。", errors);
+
+    const digest = JSON.stringify({ contactName, phone, deliveryMethod: input.deliveryMethod, address, note,
+      items: [...input.items].map((i) => [i.productId.toLowerCase(), i.quantity]).sort() });
+    const existing = mockOrders.get(idempotencyKey.toLowerCase());
+    if (existing) {
+      if (existing.digest !== digest) fail(409, "IDEMPOTENCY_KEY_CONFLICT", "这次提交与原订货单内容不同，请重新确认。");
+      return existing.receipt;
+    }
+
+    const rows = input.items.map((item) => products.find((p) => p.id === item.productId.toLowerCase() && p.isPublished));
+    const unavailable = input.items.flatMap((item, i): UnavailableItem[] => {
+      const row = rows[i];
+      if (!row) return [{ productId: item.productId, reason: "unavailable" as const }];
+      return row.isOutOfStock ? [{ productId: item.productId, reason: "out_of_stock" as const }] : [];
+    });
+    if (unavailable.length) {
+      throw new ApiError(409, "ORDER_PRODUCTS_UNAVAILABLE", "部分商品已下架、删除或缺货，请返回购物车调整。", undefined, unavailable);
+    }
+
+    const items = input.items.map((item, i) => {
+      const row = rows[i]!;
+      return {
+        productId: row.id, name: row.name, brand: row.brand, model: row.model, unit: row.unit,
+        unitPriceCents: row.priceCents, quantity: item.quantity,
+        subtotalCents: row.priceCents === null ? null : row.priceCents * item.quantity,
+      };
+    });
+    const now = new Date();
+    const ymd = now.toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" }).replace(/-/g, "");
+    mockOrderSeq += 1;
+    const receipt: OrderReceipt = {
+      orderNo: `WJ-${ymd}-${String(mockOrderSeq).padStart(4, "0")}`,
+      createdAt: now.toISOString(),
+      contactName,
+      items,
+      estimatedTotalCents: items.reduce((sum, i) => sum + (i.subtotalCents ?? 0), 0),
+    };
+    mockOrders.set(idempotencyKey.toLowerCase(), { digest, receipt });
+    const created = receipt.createdAt;
+    adminOrders = [
+      {
+        ...receipt, updatedAt: created, phone, deliveryMethod: input.deliveryMethod, status: "pending_contact", paymentStatus: "unpaid",
+        itemCount: items.length, itemsPreview: items.slice(0, 2).map(({ name, quantity }) => ({ name, quantity })),
+        finalTotalCents: null, address, note, adminNote: "", cancellationReason: null,
+        statusUpdatedAt: created, paymentStatusUpdatedAt: created, adminNoteUpdatedAt: null, finalTotalUpdatedAt: null, cancellationReasonUpdatedAt: null,
+      },
+      ...adminOrders,
+    ];
+    return receipt;
+  }, 500);
+}
+
+// ── 后台订单（阶段 B） ─────────────────────────────────
+
+export function listAdminOrders(query: AdminOrderQuery = {}): Promise<OrderPage> {
+  return admin(() => {
+    const q = (query.q ?? "").trim().toLowerCase();
+    const matched = adminOrders
+      .filter((o) => !query.status || o.status === query.status)
+      .filter((o) => !query.paymentStatus || o.paymentStatus === query.paymentStatus)
+      .filter((o) => inRange(o.createdAt, query.from, query.to))
+      .filter((o) => !q || o.orderNo.toLowerCase().includes(q) || o.phone.includes(q))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.orderNo.localeCompare(a.orderNo));
+    const page = Number(query.page ?? "1");
+    const size = Number(query.pageSize ?? "20");
+    const items = matched.slice((page - 1) * size, page * size).map((o) => ({
+      orderNo: o.orderNo, createdAt: o.createdAt, updatedAt: o.updatedAt, contactName: o.contactName, phone: o.phone,
+      deliveryMethod: o.deliveryMethod, status: o.status, paymentStatus: o.paymentStatus, itemCount: o.itemCount,
+      itemsPreview: o.itemsPreview, estimatedTotalCents: o.estimatedTotalCents, finalTotalCents: o.finalTotalCents,
+    }));
+    return { items, total: matched.length };
+  });
+}
+
+/** 演示用 CSV：列和格式尽量与契约一致，正式文件由后端生成。 */
+export function orderExportLink(from: string, to: string): Promise<OrderExportLink> {
+  return admin(() => {
+    const yuan = (cents: number | null) => (cents === null ? "" : (cents / 100).toFixed(2));
+    const cell = (value: string) => (/[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+    const time = (iso: string) => new Date(iso).toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" }).slice(0, 16);
+    const labels = {
+      delivery: { delivery: "送货", pickup: "到店自提" },
+      status: { pending_contact: "待联系", pending_payment: "待收款", pending_fulfillment: "待履约", completed: "已完成", cancelled: "已取消" },
+      payment: { unpaid: "未收款", paid: "已收款" },
+    } as const;
+    const rows = adminOrders
+      .filter((o) => inRange(o.createdAt, from, to))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((o) => [
+        o.orderNo, time(o.createdAt), o.contactName, `="${o.phone}"`, labels.delivery[o.deliveryMethod], o.address ?? "", o.note,
+        o.items.map((i) => `${i.name}${i.model ? " " + i.model : ""} ×${i.quantity}（${i.subtotalCents === null ? "面议" : "¥" + yuan(i.subtotalCents)}）`).join("；"),
+        yuan(o.estimatedTotalCents), yuan(o.finalTotalCents), labels.status[o.status], labels.payment[o.paymentStatus],
+      ]);
+    const header = ["订单号", "下单时间", "联系人", "手机号", "配送方式", "收货地址", "备注", "商品明细", "预估商品金额（元）", "最终确认金额（元）", "订单状态", "收款状态"];
+    const text = "﻿" + [header, ...rows].map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
+    const day = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" }).replace(/-/g, "");
+    const last = day(new Date(Date.parse(to) - 1).toISOString());
+    return { url: URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" })), filename: `订单_${day(from)}-${last}.csv` };
+  });
+}
+
+function findOrder(orderNo: string): OrderDetail {
+  const order = adminOrders.find((o) => o.orderNo === orderNo);
+  if (!order) fail(404, "ORDER_NOT_FOUND", "找不到该订单。");
+  return order;
+}
+
+export function getAdminOrder(orderNo: string): Promise<OrderDetail> {
+  return admin(() => findOrder(orderNo));
+}
+
+/** 按契约：任意状态可互改；改为已取消须带原因；未取消时单独改原因返回冲突；只更新实际变化的字段时间。 */
+export function updateAdminOrder(orderNo: string, patch: UpdateOrder): Promise<OrderDetail> {
+  return admin(() => {
+    const current = findOrder(orderNo);
+    if (patch.status === "cancelled" && !patch.cancellationReason?.trim()) {
+      fail(400, "INVALID_REQUEST", "请检查填写的内容后重试。", { cancellationReason: "请填写取消原因。" });
+    }
+    if (patch.status && patch.status !== "cancelled" && patch.cancellationReason !== undefined) {
+      fail(400, "INVALID_REQUEST", "请检查填写的内容后重试。", { cancellationReason: "仅已取消的订单可以填写取消原因。" });
+    }
+    const status = patch.status ?? current.status;
+    if (patch.cancellationReason !== undefined && status !== "cancelled") {
+      fail(409, "ORDER_STATUS_CONFLICT", "订单尚未取消，无法单独修改取消原因。");
+    }
+    const now = new Date().toISOString();
+    const next: Record<string, unknown> = { ...current };
+    const apply = (key: keyof OrderDetail, value: unknown, stamp: keyof OrderDetail) => {
+      if (value === undefined || value === current[key]) return;
+      next[key] = value;
+      next[stamp] = now;
+      next.updatedAt = now;
+    };
+    apply("status", patch.status, "statusUpdatedAt");
+    apply("paymentStatus", patch.paymentStatus, "paymentStatusUpdatedAt");
+    apply("adminNote", patch.adminNote?.trim(), "adminNoteUpdatedAt");
+    apply("cancellationReason", patch.cancellationReason?.trim(), "cancellationReasonUpdatedAt");
+    apply("finalTotalCents", patch.finalTotalCents, "finalTotalUpdatedAt");
+    const updated = next as OrderDetail;
+    adminOrders = adminOrders.map((o) => (o.orderNo === orderNo ? updated : o));
+    return updated;
+  }, 300);
 }
 
 // ── 管理员会话 ────────────────────────────────────────
