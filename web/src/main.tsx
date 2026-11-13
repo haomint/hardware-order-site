@@ -1,12 +1,14 @@
-import { StrictMode } from "react";
+import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./index.css";
 import { ShopProvider } from "./lib/shop.tsx";
-import { ToastHost } from "./components/Feedback.tsx";
-import { EmptyNotice } from "./components/Feedback.tsx";
+import { EmptyNotice, ToastHost } from "./components/Feedback.tsx";
 import { Home } from "./pages/Home.tsx";
 import { ProductDetail } from "./pages/ProductDetail.tsx";
+
+// 后台按需加载，客户不会下载后台代码。
+const AdminApp = lazy(() => import("./admin/index.tsx"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -15,6 +17,14 @@ createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/p/:id" element={<ProductDetail />} />
+          <Route
+            path="/admin/*"
+            element={
+              <Suspense fallback={<p className="py-20 text-center text-base text-muted">正在打开后台…</p>}>
+                <AdminApp />
+              </Suspense>
+            }
+          />
           <Route
             path="*"
             element={

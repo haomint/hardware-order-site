@@ -1,5 +1,21 @@
-import { ApiError } from "./types.ts";
-import type { Category, ListResult, ProductDetail, ProductListItem, ProductQuery, Shop } from "./types.ts";
+import { ApiError, UNAUTHENTICATED_EVENT } from "./types.ts";
+import type {
+  AdminImage,
+  AdminProduct,
+  AdminProductQuery,
+  AdminSession,
+  Category,
+  CategoryInput,
+  CategoryPatch,
+  CreateProduct,
+  ListResult,
+  LoginInput,
+  ProductDetail,
+  ProductListItem,
+  ProductQuery,
+  Shop,
+  UpdateProduct,
+} from "./types.ts";
 
 const NETWORK_MESSAGE = "网络不太顺畅，请检查网络后重试。";
 const FALLBACK_MESSAGE = "服务暂时不可用，请稍后再试。";
@@ -30,7 +46,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     // 响应体不是约定的错误格式时，使用兜底提示。
   }
+  if (code === "UNAUTHENTICATED") window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT));
   throw new ApiError(response.status, code, message, fieldErrors);
+}
+
+function json(method: "POST" | "PATCH", body: unknown): RequestInit {
+  return { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
 }
 
 function toSearch(query: Record<string, string | undefined>): string {
@@ -41,6 +62,10 @@ function toSearch(query: Record<string, string | undefined>): string {
   const text = params.toString();
   return text ? `?${text}` : "";
 }
+
+const id = (value: string) => encodeURIComponent(value);
+
+// ── 公开接口 ──────────────────────────────────────────
 
 export function getShop(): Promise<Shop> {
   return request("/api/shop");
@@ -54,6 +79,69 @@ export function listProducts(query: ProductQuery = {}): Promise<ListResult<Produ
   return request(`/api/products${toSearch(query)}`);
 }
 
-export function getProduct(id: string): Promise<ProductDetail> {
-  return request(`/api/products/${encodeURIComponent(id)}`);
+export function getProduct(productId: string): Promise<ProductDetail> {
+  return request(`/api/products/${id(productId)}`);
+}
+
+// ── 管理员会话 ────────────────────────────────────────
+
+export function login(input: LoginInput): Promise<AdminSession> {
+  return request("/api/admin/login", json("POST", input));
+}
+
+export function getSession(): Promise<AdminSession> {
+  return request("/api/admin/session");
+}
+
+export function logout(): Promise<void> {
+  return request("/api/admin/logout", { method: "POST" });
+}
+
+// ── 后台分类 ──────────────────────────────────────────
+
+export function listAdminCategories(): Promise<ListResult<Category>> {
+  return request("/api/admin/categories");
+}
+
+export function createCategory(input: CategoryInput): Promise<Category> {
+  return request("/api/admin/categories", json("POST", input));
+}
+
+export function updateCategory(categoryId: string, patch: CategoryPatch): Promise<Category> {
+  return request(`/api/admin/categories/${id(categoryId)}`, json("PATCH", patch));
+}
+
+export function deleteCategory(categoryId: string): Promise<void> {
+  return request(`/api/admin/categories/${id(categoryId)}`, { method: "DELETE" });
+}
+
+// ── 后台商品 ──────────────────────────────────────────
+
+export function listAdminProducts(query: AdminProductQuery = {}): Promise<ListResult<AdminProduct>> {
+  return request(`/api/admin/products${toSearch(query)}`);
+}
+
+export function getAdminProduct(productId: string): Promise<AdminProduct> {
+  return request(`/api/admin/products/${id(productId)}`);
+}
+
+export function createProduct(input: CreateProduct): Promise<AdminProduct> {
+  return request("/api/admin/products", json("POST", input));
+}
+
+export function updateProduct(productId: string, patch: UpdateProduct): Promise<AdminProduct> {
+  return request(`/api/admin/products/${id(productId)}`, json("PATCH", patch));
+}
+
+export function deleteProduct(productId: string): Promise<void> {
+  return request(`/api/admin/products/${id(productId)}`, { method: "DELETE" });
+}
+
+// ── 图片 ──────────────────────────────────────────────
+
+export function uploadImage(file: File): Promise<AdminImage> {
+  const form = new FormData();
+  form.append("file", file);
+  // 不手动设置 Content-Type，让浏览器自动带上 multipart 分隔符。
+  return request("/api/admin/images", { method: "POST", body: form });
 }
