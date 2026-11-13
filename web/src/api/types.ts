@@ -11,7 +11,12 @@ export type {
   CreateProduct,
   UpdateProduct,
   CartLookupResult,
+  CreateOrder,
+  OrderReceipt,
 } from "../../../shared/index.ts";
+
+/** ORDER_PRODUCTS_UNAVAILABLE 附带的不可订商品明细。 */
+export type UnavailableItem = { productId: string; reason: "unavailable" | "out_of_stock" };
 
 export type ListResult<T> = { items: T[]; total: number };
 
@@ -41,13 +46,22 @@ export class ApiError extends Error {
   readonly status: number;
   /** 仅 INVALID_REQUEST 可能附带：字段路径 -> 中文提示。 */
   readonly fieldErrors?: Record<string, string>;
+  /** 仅 ORDER_PRODUCTS_UNAVAILABLE 附带：哪些商品不可订。 */
+  readonly unavailableItems?: UnavailableItem[];
 
-  constructor(status: number, code: string, message: string, fieldErrors?: Record<string, string>) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    fieldErrors?: Record<string, string>,
+    unavailableItems?: UnavailableItem[],
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.fieldErrors = fieldErrors;
+    this.unavailableItems = unavailableItems;
   }
 }
 
