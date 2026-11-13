@@ -12,13 +12,13 @@ export class ApiFailure extends Error {
 }
 
 type OrderFailureCode = "ORDER_PRODUCTS_UNAVAILABLE" | "IDEMPOTENCY_KEY_CONFLICT"
-  | "ORDER_TOTAL_TOO_LARGE" | "TOO_MANY_REQUESTS";
+  | "ORDER_TOTAL_TOO_LARGE" | "TOO_MANY_REQUESTS" | "ORDER_NOT_FOUND" | "ORDER_STATUS_CONFLICT";
 type UnavailableItems = Extract<
   ReturnType<typeof StageBApiErrorSchema.parse>, { code: "ORDER_PRODUCTS_UNAVAILABLE" }
 >["unavailableItems"];
 
 export class OrderFailure extends Error {
-  readonly status: 409 | 429;
+  readonly status: 404 | 409 | 429;
   readonly response: ReturnType<typeof StageBApiErrorSchema.parse>;
 
   constructor(code: Exclude<OrderFailureCode, "ORDER_PRODUCTS_UNAVAILABLE">);

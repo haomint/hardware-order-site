@@ -8,6 +8,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { cors } from "hono/cors";
 import { AdminSessionCookieName, ApiErrorSchema, apiErrors, stageA, stageB } from "../../shared/index.ts";
 import { createAuth } from "./auth.ts";
+import { createAdminOrders } from "./admin-orders.ts";
 import { createCatalog } from "./catalog.ts";
 import type { Config } from "./config.ts";
 import { ApiFailure, OrderFailure, validate, type Schema } from "./errors.ts";
@@ -114,6 +115,7 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
   const auth = createAuth(db, now);
   const catalog = createCatalog(db, now);
   const orders = createOrders(db, catalog.findPublicItem, now);
+  const adminOrders = createAdminOrders(db, now);
   const limitOrderSubmission = createOrderSubmissionLimiter(now);
   const images = createImages(db, config.uploadDir, now);
   const queueUpload = uploadQueue();
@@ -183,7 +185,7 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
       }));
     }
 
-    const path = route.path.replace("{id}", ":id");
+    const path = route.path.replace(/\{(\w+)\}/g, ":$1");
     app.on([route.method.toUpperCase()], [path], ...middleware, async (c: ApiContext) => {
       const inputs = {
         params: route.params ? validate(route.params, c.req.param()) : undefined,
@@ -213,6 +215,9 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
     }
     return receipt;
   }, (c) => limitOrderSubmission(visitorIp(c, config.trustProxy)));
+  add(stageB.listAdminOrders, ({ query }) => adminOrders.list(query));
+  add(stageB.getAdminOrder, ({ params }) => adminOrders.get(params.orderNo));
+  add(stageB.updateAdminOrder, ({ params, body }) => adminOrders.update(params.orderNo, body));
 
   add(stageA.login, async ({ body }, c) => {
     const session = await auth.login(body, visitorIp(c, config.trustProxy), getCookie(c, AdminSessionCookieName));
