@@ -53,7 +53,13 @@ npm --prefix web run dev
 
 浏览器打开 `http://localhost:5173`，后台在 `/admin`，假数据模式的演示账号会显示在登录页上。
 
-接真实后端的步骤见 [server/README.md](server/README.md) 和 [web/README.md](web/README.md)。
+连本机真实后端（先按 [server/README.md](server/README.md) 准备并启动后端）：
+
+```sh
+npm --prefix web run dev:api
+```
+
+正式打包（`npm --prefix web run build`）一律连真实后端，不含假数据。用手机联调的步骤见 [web/README.md](web/README.md)。
 
 ## 自动检查
 
