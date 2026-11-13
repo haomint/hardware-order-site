@@ -1,6 +1,6 @@
-import type { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
 import {
-  AdminOrderQuerySchema, OrderDetailSchema, type OrderDetail, type OrderPage, type UpdateOrder,
+  AdminOrderQuerySchema, OrderDetailSchema, type OrderDetail, type OrderExportQuery, type OrderPage, type UpdateOrder,
 } from "../../shared/index.ts";
 import { transaction } from "./db.ts";
 import { OrderFailure } from "./errors.ts";
@@ -31,6 +31,7 @@ type OrderRow = {
 
 const iso = (timestamp: number) => new Date(timestamp).toISOString();
 const optionalIso = (timestamp: number | null) => timestamp === null ? null : iso(timestamp);
+const orderBy = "ORDER BY created_at DESC, order_no DESC";
 
 function orderSummary(row: OrderRow, items: OrderDetail["items"]): OrderPage["items"][number] {
   return {
@@ -78,7 +79,7 @@ export function createAdminOrders(db: DatabaseSync, now: () => number) {
   const count = db.prepare(`SELECT count(*) AS total FROM orders ${filter}`);
   const page = db.prepare(`
     SELECT * FROM orders ${filter}
-    ORDER BY created_at DESC, order_no DESC LIMIT :limit OFFSET :offset
+    ${orderBy} LIMIT :limit OFFSET :offset
   `);
   const update = db.prepare(`
     UPDATE orders SET
@@ -97,6 +98,22 @@ export function createAdminOrders(db: DatabaseSync, now: () => number) {
   }
 
   return {
+    *exportRange({ from, to }: OrderExportQuery): Generator<OrderDetail> {
+      const location = db.location();
+      // 下载使用独立的只读连接，在分块读取时保留同一查询快照。
+      const reader = location ? new DatabaseSync(location, { readOnly: true }) : db;
+      try {
+        const statement = reader.prepare(`
+          SELECT * FROM orders WHERE created_at >= ? AND created_at < ? ${orderBy}
+        `);
+        const start = Date.parse(from);
+        const end = Date.parse(to);
+        const rows = location ? statement.iterate(start, end) : statement.all(start, end);
+        for (const row of rows) yield orderDetail(row as OrderRow);
+      } finally {
+        if (reader !== db) reader.close();
+      }
+    },
     list(query: Query): OrderPage {
       const filters = {
         status: query.status ?? null,
