@@ -50,16 +50,18 @@ const errorMessage = z.string("错误提示必须是文字。").min(1, "请提�
 const fieldErrorsDescription = "INVALID_REQUEST 可以附带 fieldErrors。键为字段路径，如 name 或 detailImageIds.0，数组下标从 0 开始。值为简体中文提示。无法定位字段时使用 message。";
 const errorResponseMessage = "错误响应格式不正确。";
 
+export const InvalidRequestErrorSchema = z.strictObject({
+  code: z.literal("INVALID_REQUEST", "错误标识不正确。"),
+  message: errorMessage,
+  fieldErrors: z.record(
+    z.string("字段路径必须是文字。").min(1, "请提供字段路径。"),
+    errorMessage,
+    "字段错误必须是字段路径到中文提示的映射。",
+  ).optional().describe(fieldErrorsDescription),
+}, errorResponseMessage);
+
 export const ApiErrorSchema = z.discriminatedUnion("code", [
-  z.strictObject({
-    code: z.literal("INVALID_REQUEST", "错误标识不正确。"),
-    message: errorMessage,
-    fieldErrors: z.record(
-      z.string("字段路径必须是文字。").min(1, "请提供字段路径。"),
-      errorMessage,
-      "字段错误必须是字段路径到中文提示的映射。",
-    ).optional().describe(fieldErrorsDescription),
-  }, errorResponseMessage),
+  InvalidRequestErrorSchema,
   z.strictObject({
     code: z.enum(otherErrorCodes, "错误标识不正确。"),
     message: errorMessage,
