@@ -602,7 +602,7 @@ function ImageTile({
   onMakeMain?: () => void;
 }) {
   return (
-    <div className={`relative shrink-0 ${large ? "h-28 w-28" : "aspect-square w-full"}`}>
+    <div className={`relative shrink-0 ${large ? "h-28 w-28" : "ratio-square"}`}>
       <img src={image.thumbnailUrl} alt="" className="h-full w-full rounded-md border border-line bg-white object-contain" />
       <button
         type="button"
@@ -640,12 +640,15 @@ function UploadTile({
 }) {
   return (
     <label
-      className={`flex shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-line text-sm text-muted active:bg-brand-soft ${
-        large ? "h-28 w-28" : "aspect-square w-full"
+      className={`relative block shrink-0 cursor-pointer rounded-md border-2 border-dashed border-line text-sm text-muted active:bg-brand-soft ${
+        large ? "h-28 w-28" : "ratio-square"
       } ${disabled ? "pointer-events-none opacity-50" : ""}`}
     >
-      <PlusIcon size={24} />
-      {label}
+      {/* 用 ratio-fill 铺满方块，旧版 iOS 上也保持正方形 */}
+      <span className="ratio-fill absolute inset-0 flex flex-col items-center justify-center gap-1">
+        <PlusIcon size={24} />
+        {label}
+      </span>
       <FileInput multiple={multiple} disabled={disabled} onFiles={onFiles} />
     </label>
   );

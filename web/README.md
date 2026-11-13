@@ -35,8 +35,9 @@ npm --prefix web run build       # 正式构建，产物在 web/dist
 | `src/index.css` | 设计变量（颜色、圆角）。调整整体风格只改这里 |
 | `src/api/` | 数据请求。`index.ts` 是唯一入口，`http.ts` 请求真实后端，`mock.ts` 是假数据 |
 | `src/lib/` | 购物车（本机存储）、店铺资料、金额格式化等 |
-| `src/components/` | 商品卡片、价格、提示等通用部件 |
-| `src/pages/` | 商城页面：首页 `Home.tsx`、商品详情 `ProductDetail.tsx` |
+| `src/components/` | 商品卡片、价格、底部导航、联系店铺面板、横幅等通用部件 |
+| `src/components/art.ts` | 内置五金插图：分类图标按名称关键词自动匹配，横幅和假数据商品图也用它 |
+| `src/pages/` | 商城页面：首页 `Home.tsx`、分类 `Categories.tsx`、商品详情 `ProductDetail.tsx` |
 | `src/admin/` | 后台页面，单独打包、按需加载：登录、商品列表与编辑、分类管理 |
 | `src/lib/image.ts` | 上传前把照片缩小到长边 1600 像素并转成 JPEG（含苹果手机的 HEIC 照片） |
 
@@ -48,6 +49,13 @@ npm --prefix web run build       # 正式构建，产物在 web/dist
 - 订单管理：阶段 B。
 
 假数据模式下后台的演示账号是 `admin` / `demo1234`，登录页上也会显示。这个账号只在假数据里有效，真实后端的管理员账号由部署时设置。
+
+## 手机适配
+
+- **苹果手机**：底部导航和底部按钮留出底部横条的安全区；输入框字号不小于 16px，聚焦时不放大页面。
+- **旧版 iOS（14 及以下）**：正方形图片用 `ratio-square` 类（padding 撑高），不依赖 aspect-ratio。
+- **安卓与微信**：去掉点击延迟；字体优先用系统中文字体（鸿蒙、MiSans、思源黑体）；复制文字对旧版微信有兜底。
+- 已在 360×780、375×667、390×844、412×915、430×932 五种尺寸下检查。
 
 ## 技术选择说明
 
