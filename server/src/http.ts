@@ -1,4 +1,7 @@
+import type { IncomingMessage } from "node:http";
+import { isIP, SocketAddress } from "node:net";
 import type { DatabaseSync } from "node:sqlite";
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { getCookie, setCookie } from "hono/cookie";
@@ -10,8 +13,31 @@ import type { Config } from "./config.ts";
 import { ApiFailure, validate, type Schema } from "./errors.ts";
 import { createImages } from "./images.ts";
 
-type HttpEnv = { Variables: { adminUsername: string } };
+type NodeConnection = { incoming: IncomingMessage };
+type HttpEnv = {
+  Bindings: NodeConnection | { server: NodeConnection };
+  Variables: { adminUsername: string };
+};
 type ApiContext = Context<HttpEnv>;
+
+function normalizeIp(value?: string) {
+  if (!value) return undefined;
+  const family = isIP(value);
+  if (family === 4) return value;
+  if (family !== 6) return undefined;
+  const address = new SocketAddress({ address: value, family: "ipv6" }).address;
+  return address.startsWith("::ffff:") ? address.slice("::ffff:".length) : address;
+}
+
+function visitorIp(c: ApiContext, trustProxy: boolean) {
+  if (trustProxy) {
+    // 直属反向代理覆盖转发链，或在链的最右侧追加它看到的访问者地址。
+    const forwarded = c.req.header("X-Forwarded-For")?.split(",").at(-1)?.trim();
+    const ip = normalizeIp(forwarded) ?? normalizeIp(c.req.header("X-Real-IP")?.trim());
+    if (ip) return ip;
+  }
+  return normalizeIp(c.env ? getConnInfo(c).remote.address : undefined) ?? "unknown";
+}
 
 type Route = {
   method: "get" | "post" | "patch" | "delete";
@@ -167,7 +193,7 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
   add(stageA.getProduct, ({ params }) => catalog.getProduct(params.id.toLowerCase()));
 
   add(stageA.login, async ({ body }, c) => {
-    const session = await auth.login(body, getCookie(c, AdminSessionCookieName));
+    const session = await auth.login(body, visitorIp(c, config.trustProxy), getCookie(c, AdminSessionCookieName));
     writeCookie(c, session.token, Math.ceil((session.expiresAt - now()) / 1000));
     return { username: session.username };
   });

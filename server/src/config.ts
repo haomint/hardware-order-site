@@ -24,6 +24,8 @@ export function loadConfig(env = process.env) {
 
   const port = Number(env.PORT || 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT 必须是有效端口。");
+  const trustProxy = env.TRUST_PROXY ?? "false";
+  if (trustProxy !== "true" && trustProxy !== "false") throw new Error("TRUST_PROXY 必须是 true 或 false。");
 
   return {
     port,
@@ -31,6 +33,7 @@ export function loadConfig(env = process.env) {
     databasePath: databasePath(env),
     uploadDir: resolve(env.UPLOAD_DIR || "uploads"),
     siteOrigin,
+    trustProxy: trustProxy === "true",
     developmentOrigins,
     secureCookie: production || siteOrigin.startsWith("https://"),
     shop: ShopSchema.parse({

@@ -6,10 +6,15 @@ import { transaction } from "./db.ts";
 import { ApiFailure } from "./errors.ts";
 
 const loginWindow = 15 * 60 * 1000;
-const loginLimit = 10;
+const ipFailureLimit = 10;
+const siteFailureLimit = 100;
 const sessionLifetime = AdminSessionDays * 24 * 60 * 60 * 1000;
 type Login = ReturnType<typeof LoginSchema.parse>;
 type Administrator = { username: string; password_hash: string };
+
+function discardExpiredFailures(failures: number[], timestamp: number) {
+  while (failures.length && failures[0] <= timestamp - loginWindow) failures.shift();
+}
 
 function tokenHash(token?: string) {
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return undefined;
@@ -41,26 +46,30 @@ export function createAuth(db: DatabaseSync, now: () => number) {
     WHERE token_hash = :digest AND expires_at > :requestTime RETURNING expires_at
   `);
   const deleteExpired = db.prepare("DELETE FROM admin_sessions WHERE expires_at <= ?");
-  let windowEnds = 0;
-  let attempts = 0;
+  const failuresByIp = new Map<string, number[]>();
+  const siteFailures: number[] = [];
   let verifying = false;
 
   return {
-    async login(input: Login, oldToken?: string) {
+    async login(input: Login, ip: string, oldToken?: string) {
       const startedAt = now();
-      if (startedAt >= windowEnds) {
-        windowEnds = startedAt + loginWindow;
-        attempts = 0;
+      discardExpiredFailures(siteFailures, startedAt);
+      const ipFailures = failuresByIp.get(ip) ?? [];
+      discardExpiredFailures(ipFailures, startedAt);
+      if (ipFailures.length >= ipFailureLimit || siteFailures.length >= siteFailureLimit || verifying) {
+        throw new ApiFailure("TOO_MANY_REQUESTS");
       }
-      if (attempts >= loginLimit || verifying) throw new ApiFailure("TOO_MANY_REQUESTS");
-      attempts += 1;
       verifying = true;
       try {
         const account = admin.get() as Administrator | undefined;
         if (!account || !(await verify(account.password_hash, input.password)) || account.username !== input.username) {
+          const failedAt = now();
+          ipFailures.push(failedAt);
+          siteFailures.push(failedAt);
+          failuresByIp.set(ip, ipFailures);
           throw new ApiFailure("INVALID_CREDENTIALS");
         }
-        return transaction(db, () => {
+        const session = transaction(db, () => {
           const current = admin.get();
           if (current?.username !== account.username || current.password_hash !== account.password_hash) {
             throw new ApiFailure("INVALID_CREDENTIALS");
@@ -71,9 +80,10 @@ export function createAuth(db: DatabaseSync, now: () => number) {
           const digest = createHash("sha256").update(token).digest("hex");
           const expiresAt = now() + sessionLifetime;
           createSession.run(digest, expiresAt);
-          attempts = 0;
           return { username: account.username, token, expiresAt };
         });
+        failuresByIp.delete(ip);
+        return session;
       } finally {
         verifying = false;
       }
@@ -93,7 +103,13 @@ export function createAuth(db: DatabaseSync, now: () => number) {
       if (digest) revokeSession.run(digest);
     },
     cleanup() {
-      deleteExpired.run(now());
+      const timestamp = now();
+      deleteExpired.run(timestamp);
+      discardExpiredFailures(siteFailures, timestamp);
+      for (const [ip, failures] of failuresByIp) {
+        discardExpiredFailures(failures, timestamp);
+        if (!failures.length) failuresByIp.delete(ip);
+      }
     },
   };
 }

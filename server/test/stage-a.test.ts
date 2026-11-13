@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { IncomingMessage } from "node:http";
+import { Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -25,8 +27,16 @@ const origin = "http://localhost:5173";
 const credentials = { username: "test-owner", password: "test-fixture-password" };
 const hour = 60 * 60 * 1000;
 const day = 24 * hour;
+const loginWindow = 15 * 60 * 1000;
+const wrongCredentials = { ...credentials, password: "incorrect" };
 
-function fixture(t: TestContext) {
+function connection(ip: string) {
+  const socket = new Socket();
+  Object.defineProperty(socket, "remoteAddress", { value: ip });
+  return { incoming: new IncomingMessage(socket) };
+}
+
+function fixture(t: TestContext, env: NodeJS.ProcessEnv = {}) {
   const dir = mkdtempSync(join(tmpdir(), "hardware-order-"));
   const dbPath = join(dir, "store.sqlite");
   const db = openDatabase(dbPath);
@@ -37,6 +47,7 @@ function fixture(t: TestContext) {
     UPLOAD_DIR: uploadDir,
     SHOP_NAME: "威马五金测试店",
     SHOP_PHONE: "0755-12345678",
+    ...env,
   });
   const { app, cleanup } = createApp(db, config, () => timestamp);
   t.after(() => {
@@ -76,7 +87,7 @@ async function error(response: Response, status: number, code: string) {
   return body;
 }
 
-test("管理员会话校验来源、续期、过期、退出并限制登录频率", async (t) => {
+test("管理员会话校验来源、续期、过期和退出", async (t) => {
   const { app, db, request, login, advance } = fixture(t);
   await setAdministrator(db, credentials);
   await error(await request("/api/admin/session"), 401, "UNAUTHENTICATED");
@@ -114,13 +125,69 @@ test("管理员会话校验来源、续期、过期、退出并限制登录频�
   await login();
   await setAdministrator(db, credentials);
   await error(await request("/api/admin/session"), 401, "UNAUTHENTICATED");
+});
 
+function loginFrom(app: ReturnType<typeof createApp>["app"], ip: string, headers?: HeadersInit) {
+  const requestHeaders = new Headers(headers);
+  requestHeaders.set("Origin", origin);
+  requestHeaders.set("Content-Type", "application/json");
+  return (body: typeof credentials) => app.request("/api/admin/login", {
+    method: "POST",
+    headers: requestHeaders,
+    body: JSON.stringify(body),
+  }, connection(ip));
+}
+
+test("登录限流按 TCP 地址隔离，默认忽略转发头，成功后清零", async (t) => {
+  const { app, db, advance } = fixture(t);
+  await setAdministrator(db, credentials);
+  const loginA = loginFrom(app, "192.0.2.1");
+  const loginB = loginFrom(app, "192.0.2.2");
+
+  // 成功前后的失败次数各自统计，成功请求也不会计入失败次数。
+  await error(await loginA(wrongCredentials), 401, "INVALID_CREDENTIALS");
+  assert.equal((await loginA(credentials)).status, 200);
   for (let index = 0; index < 10; index += 1) {
-    await error(await request("/api/admin/login", "POST", { ...credentials, password: "incorrect" }), 401, "INVALID_CREDENTIALS");
+    const spoofed = loginFrom(app, "192.0.2.1", {
+      "X-Forwarded-For": `198.51.100.${index + 1}`,
+      "X-Real-IP": `203.0.113.${index + 1}`,
+    });
+    await error(await spoofed(wrongCredentials), 401, "INVALID_CREDENTIALS");
   }
-  await error(await request("/api/admin/login", "POST", credentials), 429, "TOO_MANY_REQUESTS");
-  advance(15 * 60 * 1000);
-  await login();
+  await error(await loginFrom(app, "::ffff:192.0.2.1", {
+    "X-Forwarded-For": "192.0.2.2",
+    "X-Real-IP": "192.0.2.2",
+  })(credentials), 429, "TOO_MANY_REQUESTS");
+  assert.equal((await loginB(credentials)).status, 200);
+  await error(await loginA(credentials), 429, "TOO_MANY_REQUESTS");
+  advance(loginWindow);
+  assert.equal((await loginA(credentials)).status, 200);
+});
+
+test("可信反向代理使用转发链最右侧的地址，并支持 X-Real-IP", async (t) => {
+  const { app, db } = fixture(t, { TRUST_PROXY: "true" });
+  await setAdministrator(db, credentials);
+  for (let index = 0; index < 10; index += 1) {
+    await error(await loginFrom(app, "127.0.0.1", {
+      "X-Forwarded-For": `198.51.100.${index + 1}, 192.0.2.1`,
+      "X-Real-IP": "192.0.2.2",
+    })(wrongCredentials), 401, "INVALID_CREDENTIALS");
+  }
+  await error(await loginFrom(app, "127.0.0.1", { "X-Real-IP": "192.0.2.1" })(credentials), 429, "TOO_MANY_REQUESTS");
+  assert.equal((await loginFrom(app, "127.0.0.1", { "X-Real-IP": "192.0.2.2" })(credentials)).status, 200);
+});
+
+test("全站 15 分钟内累计 100 次失败后限制其他地址，成功登录不清除全站计数", async (t) => {
+  const { app, db, advance } = fixture(t);
+  await setAdministrator(db, credentials);
+  const owner = loginFrom(app, "203.0.113.1");
+  for (let index = 1; index <= 100; index += 1) {
+    await error(await loginFrom(app, `192.0.2.${index}`)(wrongCredentials), 401, "INVALID_CREDENTIALS");
+    if (index === 50) assert.equal((await owner(credentials)).status, 200);
+  }
+  await error(await owner(credentials), 429, "TOO_MANY_REQUESTS");
+  advance(loginWindow);
+  assert.equal((await owner(credentials)).status, 200);
 });
 
 test("生产环境只接受站点来源并设置 Secure Cookie", async (t) => {

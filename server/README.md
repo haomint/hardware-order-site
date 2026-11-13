@@ -1,6 +1,6 @@
 # server
 
-阶段 A 后端使用 Node.js 24、Hono 和 SQLite。接口定义见 [阶段 A 契约](../docs/api/stage-a.md)。
+阶段 A 后端使用 Node.js 24 或以上版本、Hono 和 SQLite。接口定义见 [阶段 A 契约](../docs/api/stage-a.md)。
 
 ## 本地启动
 
@@ -33,6 +33,14 @@ npm.cmd --prefix server start
 
 - 生产环境设置 `NODE_ENV=production` 和 HTTPS 的 `SITE_ORIGIN`。后台 Cookie 使用 `Secure`，写操作仅接受配置的站点来源。
 - 将 `DATABASE_PATH` 和 `UPLOAD_DIR` 指向持久化目录。反向代理转发 `/api` 和 `/uploads`，上传路径的 Nginx 配置可用 `client_max_body_size 11m`，为 10 MiB 图片预留表单封装空间。
+- 登录按 IP 统计过去 15 分钟内的失败次数，同一 IP 达到 10 次后返回 429。全站同时保留 100 次失败的上限。成功登录清除该 IP 的失败次数，全站的历史失败次数照常过期。
+- `TRUST_PROXY` 默认是 `false`，登录限流使用 TCP 对端地址。仅在后端只能经可信反向代理访问时设为 `true`。开启后使用 `X-Forwarded-For` 最右侧的地址，缺失或无效时依次回退到 `X-Real-IP`、TCP 对端地址。Nginx 应覆盖两个转发头：
+
+  ```nginx
+  proxy_set_header X-Forwarded-For $remote_addr;
+  proxy_set_header X-Real-IP $remote_addr;
+  ```
+
 - 上传后只保存压缩 JPEG 和缩略图。未关联的上传保留 24 小时。移除图片或删除商品后，服务端清理无引用的图片，并定时重试文件清理。
 
 ## 验证
