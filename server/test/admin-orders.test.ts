@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { OrderDetailSchema, OrderPageSchema, OrderReceiptSchema, StageBApiErrorSchema } from "../../shared/index.ts";
+import { OrderDetailSchema, OrderPageSchema, OrderReceiptSchema, StageBApiErrorSchema, orderCsvColumns } from "../../shared/index.ts";
 import { setAdministrator } from "../src/auth.ts";
 import { loadConfig } from "../src/config.ts";
 import { openDatabase } from "../src/db.ts";
@@ -178,4 +178,56 @@ test("订单可跨步、回退和恢复，收款和其他字段独立记录修�
   assert.equal(restored.adminNoteUpdatedAt, restored.updatedAt);
   advance();
   assert.deepEqual(await detail(await admin(path, { status: "pending_contact", finalTotalCents: null })), restored);
+});
+
+test("CSV 按北京时间范围导出订单快照，金额和手机号按 Excel 可读格式输出", async (t) => {
+  const { app, admin, submit, db, advance } = await fixture(t);
+  const from = "2026-11-13T01:00:00Z";
+  const to = "2026-11-13T16:00:00Z";
+  const url = `${collection}/export?${new URLSearchParams({ from, to })}`;
+  await error(await app.request(url), 401, "UNAUTHENTICATED");
+  const invalid = await error(await admin(`${collection}/export?from=${encodeURIComponent(from)}`), 400, "INVALID_REQUEST");
+  assert.ok(invalid.code === "INVALID_REQUEST" && invalid.fieldErrors?.to);
+
+  const empty = await admin(url);
+  const columns = orderCsvColumns.join(",");
+  assert.equal(await empty.text(), columns + "\r\n");
+
+  db.prepare("UPDATE products SET model = 'GSB 570', price_cents = 32900 WHERE name = '电钻'").run();
+  db.prepare("UPDATE products SET price_cents = NULL WHERE name = '钻头'").run();
+  const first = await submit();
+  advance();
+  const second = await submit("13900006666");
+  const secondPath = `${collection}/${second.orderNo}`;
+  await detail(await admin(secondPath, { status: "completed", paymentStatus: "paid", finalTotalCents: 0 }));
+  db.prepare("UPDATE orders SET contact_name = ?, note = ? WHERE order_no = ?")
+    .run("  =张师傅", '客户说"下午",再送\r\n请联系', second.orderNo);
+  const secondDetail = await detail(await admin(secondPath));
+  assert.equal(secondDetail.estimatedTotalCents, 33200);
+  assert.equal(secondDetail.finalTotalCents, 0);
+  advance(15 * 60 * 60 * 1000 - 1000);
+  const excluded = await submit();
+  assert.equal(excluded.createdAt, "2026-11-13T16:00:00.000Z");
+  db.exec("DELETE FROM products");
+
+  const response = await admin(url);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Content-Type"), "text/csv; charset=utf-8");
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
+  assert.ok(response.headers.get("Set-Cookie"));
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  assert.match(disposition, /^attachment; filename="orders_20261113-20261113\.csv"; filename\*=UTF-8''/);
+  assert.equal(decodeURIComponent(disposition.split("''")[1]), "订单_20261113-20261113.csv");
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  assert.deepEqual([...bytes.slice(0, 3)], [0xef, 0xbb, 0xbf]);
+  const csv = new TextDecoder().decode(bytes);
+  const snapshots = "电钻 GSB 570 ×1（¥329.00）；钻头 ×2（面议）；锤子 ×3（¥3.00）";
+  const escapedNote = '"客户说""下午"",再送\r\n请联系"';
+  assert.equal(csv, [
+    columns,
+    `${second.orderNo},2026-11-13 09:00,'=张师傅,"=""13900006666""",送货,店铺仓库,${escapedNote},${snapshots},332.00,0.00,已完成,已收款`,
+    `${first.orderNo},2026-11-13 09:00,张师傅,"=""13812345678""",送货,店铺仓库,下午送达,${snapshots},332.00,,待联系,未收款`,
+    "",
+  ].join("\r\n"));
+  assert.ok(!csv.includes(excluded.orderNo));
 });

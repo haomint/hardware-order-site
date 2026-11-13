@@ -14,6 +14,7 @@ import type { Config } from "./config.ts";
 import { ApiFailure, OrderFailure, validate, type Schema } from "./errors.ts";
 import { createImages } from "./images.ts";
 import { createOrders, createOrderSubmissionLimiter } from "./orders.ts";
+import { orderCsvDisposition, streamOrderCsv } from "./order-csv.ts";
 
 type NodeConnection = { incoming: IncomingMessage };
 type HttpEnv = {
@@ -146,6 +147,7 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
       credentials: true,
       allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
       allowHeaders: ["Content-Type", "Idempotency-Key"],
+      exposeHeaders: ["Content-Disposition"],
     }));
   }
 
@@ -216,6 +218,15 @@ export function createApp(db: DatabaseSync, config: Config, now = Date.now) {
     return receipt;
   }, (c) => limitOrderSubmission(visitorIp(c, config.trustProxy)));
   add(stageB.listAdminOrders, ({ query }) => adminOrders.list(query));
+  add(stageB.exportAdminOrders, ({ query }, c) => {
+    const { status, mediaType } = stageB.exportAdminOrders.success;
+    const headers = {
+      "Content-Type": mediaType + "; charset=utf-8",
+      "Content-Disposition": orderCsvDisposition(query),
+    };
+    const body = c.req.raw.method === "HEAD" ? null : streamOrderCsv(adminOrders.exportRange(query));
+    return new Response(body, { status, headers });
+  });
   add(stageB.getAdminOrder, ({ params }) => adminOrders.get(params.orderNo));
   add(stageB.updateAdminOrder, ({ params, body }) => adminOrders.update(params.orderNo, body));
 
