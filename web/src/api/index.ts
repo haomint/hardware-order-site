@@ -1,15 +1,15 @@
 // 前端所有数据请求都从这里走。
-// 开发阶段默认用假数据；设置 VITE_USE_MOCK=false 后改为请求真实后端。
+// `npm run dev` 用假数据；`npm run dev:api` 和正式打包连真实后端（见 vite.config.ts）。
 import type * as Http from "./http.ts";
 
 export { ApiError, UNAUTHENTICATED_EVENT } from "./types.ts";
 export type * from "./types.ts";
 
 /** 当前是否在用假数据。仅用于在界面上给出演示提示。 */
-export const usingMock = import.meta.env.VITE_USE_MOCK !== "false";
+export const usingMock = __USE_MOCK__;
 
-// 两个实现导出同名函数。按环境变量只加载其中一个，另一个不会进入正式构建。
-const impl: Promise<typeof Http> = usingMock ? import("./mock.ts") : import("./http.ts");
+// __USE_MOCK__ 是编译时常量：正式打包时这里只剩 http.ts，假数据模块不会进入构建产物。
+const impl: Promise<typeof Http> = __USE_MOCK__ ? import("./mock.ts") : import("./http.ts");
 
 type Api = typeof Http;
 

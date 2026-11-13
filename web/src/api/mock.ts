@@ -2,6 +2,17 @@
 // 仅在 VITE_USE_MOCK 不为 false 时加载，正式构建接真实后端时不会打包进去。
 // 数据只存在内存里，刷新页面会恢复成初始状态。
 import { ApiError, UNAUTHENTICATED_EVENT } from "./types.ts";
+// 占位商品图只在假数据模式下使用，随本模块打包；正式版本不包含。
+import bulbSvg from "./mock-images/bulb.svg?url";
+import drillSvg from "./mock-images/drill.svg?url";
+import elbowSvg from "./mock-images/elbow.svg?url";
+import grinderSvg from "./mock-images/grinder.svg?url";
+import hammerSvg from "./mock-images/hammer.svg?url";
+import rollSvg from "./mock-images/roll.svg?url";
+import screwSvg from "./mock-images/screw.svg?url";
+import socketSvg from "./mock-images/socket.svg?url";
+import tapeSvg from "./mock-images/tape.svg?url";
+import wrenchSvg from "./mock-images/wrench.svg?url";
 import type {
   AdminImage,
   AdminProduct,
@@ -74,11 +85,25 @@ let categories: Category[] = [
 ];
 
 const images = new Map<string, AdminImage>();
+const mockImageUrls: Record<string, string> = {
+  bulb: bulbSvg,
+  drill: drillSvg,
+  elbow: elbowSvg,
+  grinder: grinderSvg,
+  hammer: hammerSvg,
+  roll: rollSvg,
+  screw: screwSvg,
+  socket: socketSvg,
+  tape: tapeSvg,
+  wrench: wrenchSvg,
+};
+
 function seedImage(name: string): string {
+  const url = mockImageUrls[name];
   const image: AdminImage = {
     id: newId(),
-    imageUrl: `/uploads/mock/${name}.svg`,
-    thumbnailUrl: `/uploads/mock/${name}.svg`,
+    imageUrl: url,
+    thumbnailUrl: url,
   };
   images.set(image.id, image);
   return image.id;

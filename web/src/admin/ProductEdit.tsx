@@ -289,7 +289,14 @@ function Editor({ productId, categories, initial }: { productId?: string; catego
           }));
         setErrors((previous) => ({ ...previous, mainImage: undefined, detailImages: undefined }));
       } catch (caught) {
-        toast(caught instanceof ImageError || caught instanceof ApiError ? caught.message : "图片上传失败，请重试。");
+        // 后端能指出具体原因（例如图片超过 10 MiB）时优先显示。
+        const message =
+          caught instanceof ApiError
+            ? (caught.fieldErrors?.file ?? caught.message)
+            : caught instanceof ImageError
+              ? caught.message
+              : "图片上传失败，请重试。";
+        toast(message);
       } finally {
         setUploading((n) => n - 1);
       }

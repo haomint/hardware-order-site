@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api, ApiError, usingMock } from "../api/index.ts";
+import { api, ApiError } from "../api/index.ts";
 import { useShop } from "../lib/shop.tsx";
 import { Button, Field, TextInput } from "./ui.tsx";
 
@@ -24,7 +24,7 @@ export function Login() {
 
   useEffect(() => {
     document.title = "店铺后台登录";
-    if (usingMock) {
+    if (__USE_MOCK__) {
       import("../api/mock.ts").then((mock) => setDemo({ username: mock.MOCK_USERNAME, password: mock.MOCK_PASSWORD }));
     }
   }, []);
