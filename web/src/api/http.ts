@@ -6,6 +6,8 @@ import type {
   AdminSession,
   CartLookupResult,
   Category,
+  CreateOrder,
+  OrderReceipt,
   CategoryInput,
   CategoryPatch,
   CreateProduct,
@@ -37,18 +39,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let code = "INTERNAL_ERROR";
   let message = FALLBACK_MESSAGE;
   let fieldErrors: Record<string, string> | undefined;
+  let unavailableItems: ApiError["unavailableItems"];
   try {
     const body = await response.json();
     if (body && typeof body.code === "string" && typeof body.message === "string") {
       code = body.code;
       message = body.message;
       fieldErrors = body.fieldErrors;
+      unavailableItems = Array.isArray(body.unavailableItems) ? body.unavailableItems : undefined;
     }
   } catch {
     // 响应体不是约定的错误格式时，使用兜底提示。
   }
   if (code === "UNAUTHENTICATED") window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT));
-  throw new ApiError(response.status, code, message, fieldErrors);
+  throw new ApiError(response.status, code, message, fieldErrors, unavailableItems);
 }
 
 function json(method: "POST" | "PATCH", body: unknown): RequestInit {
@@ -89,6 +93,18 @@ export function getProduct(productId: string): Promise<ProductDetail> {
 /** 按商品编号批量查询购物车商品的当前价格和可订状态（最多 100 个）。 */
 export function lookupCart(productIds: string[]): Promise<CartLookupResult> {
   return request("/api/cart/items", json("POST", { productIds }));
+}
+
+/**
+ * 提交订货单。idempotencyKey 由前端为这一次订货生成（UUID v4）；
+ * 网络失败重试时沿用同一个键，服务端只会保存一笔订单。
+ */
+export function createOrder(input: CreateOrder, idempotencyKey: string): Promise<OrderReceipt> {
+  return request("/api/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  });
 }
 
 // ── 管理员会话 ────────────────────────────────────────

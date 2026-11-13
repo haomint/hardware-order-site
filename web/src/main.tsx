@@ -9,6 +9,8 @@ import { ProductDetail } from "./pages/ProductDetail.tsx";
 import { Categories } from "./pages/Categories.tsx";
 import { Cart } from "./pages/Cart.tsx";
 import { Privacy } from "./pages/Privacy.tsx";
+import { Checkout } from "./pages/Checkout.tsx";
+import { OrderSuccess } from "./pages/OrderSuccess.tsx";
 import { ContactSheet } from "./components/ContactSheet.tsx";
 
 // 后台按需加载，客户不会下载后台代码。
@@ -22,6 +24,8 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/" element={<Home />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/cart" element={<Cart />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/order/success" element={<OrderSuccess />} />
           <Route path="/p/:id" element={<ProductDetail />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route

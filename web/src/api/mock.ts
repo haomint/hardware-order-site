@@ -20,6 +20,9 @@ import type {
   AdminSession,
   CartLookupResult,
   Category,
+  CreateOrder,
+  OrderReceipt,
+  UnavailableItem,
   CategoryInput,
   CategoryPatch,
   CreateProduct,
@@ -395,6 +398,67 @@ export function lookupCart(productIds: string[]): Promise<CartLookupResult> {
       }),
     };
   }, 220);
+}
+
+const mockOrders = new Map<string, { digest: string; receipt: OrderReceipt }>();
+let mockOrderSeq = 0;
+
+/** 按契约模拟：字段校验、缺货整单拒绝、同一个键重放返回原回执、内容不同返回冲突。 */
+export function createOrder(input: CreateOrder, idempotencyKey: string): Promise<OrderReceipt> {
+  return respond(() => {
+    const contactName = input.contactName.trim();
+    const phone = input.phone.trim();
+    const address = input.deliveryMethod === "pickup" ? null : (input.address ?? "").trim();
+    const note = (input.note ?? "").trim();
+    const errors: Record<string, string> = {};
+    if (contactName.length < 2) errors.contactName = "联系人姓名至少 2 个字符。";
+    if (contactName.length > 30) errors.contactName = "联系人姓名不能超过 30 个字符。";
+    if (!/^1[3-9][0-9]{9}$/.test(phone)) errors.phone = "请填写有效的 11 位中国大陆手机号。";
+    if (input.deliveryMethod === "delivery" && !address) errors.address = "送货时请填写收货地址。";
+    if (address && address.length > 200) errors.address = "收货地址不能超过 200 个字符。";
+    if (note.length > 300) errors.note = "备注不能超过 300 个字符。";
+    if (input.items.length === 0) errors.items = "请至少选择一种商品。";
+    if (Object.keys(errors).length) fail(400, "INVALID_REQUEST", "请检查填写的内容后重试。", errors);
+
+    const digest = JSON.stringify({ contactName, phone, deliveryMethod: input.deliveryMethod, address, note,
+      items: [...input.items].map((i) => [i.productId.toLowerCase(), i.quantity]).sort() });
+    const existing = mockOrders.get(idempotencyKey.toLowerCase());
+    if (existing) {
+      if (existing.digest !== digest) fail(409, "IDEMPOTENCY_KEY_CONFLICT", "这次提交与原订货单内容不同，请重新确认。");
+      return existing.receipt;
+    }
+
+    const rows = input.items.map((item) => products.find((p) => p.id === item.productId.toLowerCase() && p.isPublished));
+    const unavailable = input.items.flatMap((item, i): UnavailableItem[] => {
+      const row = rows[i];
+      if (!row) return [{ productId: item.productId, reason: "unavailable" as const }];
+      return row.isOutOfStock ? [{ productId: item.productId, reason: "out_of_stock" as const }] : [];
+    });
+    if (unavailable.length) {
+      throw new ApiError(409, "ORDER_PRODUCTS_UNAVAILABLE", "部分商品已下架、删除或缺货，请返回购物车调整。", undefined, unavailable);
+    }
+
+    const items = input.items.map((item, i) => {
+      const row = rows[i]!;
+      return {
+        productId: row.id, name: row.name, brand: row.brand, model: row.model, unit: row.unit,
+        unitPriceCents: row.priceCents, quantity: item.quantity,
+        subtotalCents: row.priceCents === null ? null : row.priceCents * item.quantity,
+      };
+    });
+    const now = new Date();
+    const ymd = now.toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" }).replace(/-/g, "");
+    mockOrderSeq += 1;
+    const receipt: OrderReceipt = {
+      orderNo: `WJ-${ymd}-${String(mockOrderSeq).padStart(4, "0")}`,
+      createdAt: now.toISOString(),
+      contactName,
+      items,
+      estimatedTotalCents: items.reduce((sum, i) => sum + (i.subtotalCents ?? 0), 0),
+    };
+    mockOrders.set(idempotencyKey.toLowerCase(), { digest, receipt });
+    return receipt;
+  }, 500);
 }
 
 // ── 管理员会话 ────────────────────────────────────────
