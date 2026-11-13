@@ -13,7 +13,24 @@ export type {
   CartLookupResult,
   CreateOrder,
   OrderReceipt,
+  OrderPage,
+  OrderDetail,
+  UpdateOrder,
 } from "../../../shared/index.ts";
+
+export type OrderStatus = "pending_contact" | "pending_payment" | "pending_fulfillment" | "completed" | "cancelled";
+export type PaymentStatus = "unpaid" | "paid";
+
+/** 对应契约的 AdminOrderQuerySchema：URL 查询参数都是字符串。 */
+export type AdminOrderQuery = {
+  status?: OrderStatus;
+  paymentStatus?: PaymentStatus;
+  from?: string;
+  to?: string;
+  q?: string;
+  page?: string;
+  pageSize?: string;
+};
 
 /** ORDER_PRODUCTS_UNAVAILABLE 附带的不可订商品明细。 */
 export type UnavailableItem = { productId: string; reason: "unavailable" | "out_of_stock" };
