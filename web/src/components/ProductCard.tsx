@@ -20,11 +20,11 @@ function AddButton({ product }: { product: ProductListItem }) {
         }
         toast(`已加入购物车：${product.name.length > 12 ? product.name.slice(0, 12) + "…" : product.name}`);
       }}
-      // 可点击区域 44px，看到的圆形按钮 32px。
+      // 可点击区域 44px，看到的圆形按钮 28px；浅灰底蓝色加号，让页面上的蓝色只留给主要按钮。
       className="group absolute bottom-2 right-0 flex h-11 w-11 items-center justify-center disabled:cursor-not-allowed"
     >
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white group-active:scale-90 group-active:bg-brand-dark group-disabled:bg-page group-disabled:text-faint">
-        <PlusIcon size={18} strokeWidth={2.4} />
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-page text-brand group-active:scale-90 group-active:bg-line group-disabled:text-faint/60">
+        <PlusIcon size={16} strokeWidth={2.6} />
       </span>
     </button>
   );

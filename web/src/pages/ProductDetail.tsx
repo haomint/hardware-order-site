@@ -6,6 +6,7 @@ import type { ProductDetail as Product } from "../api/index.ts";
 import { addToCart, MAX_LINES, MAX_QUANTITY } from "../lib/cart.ts";
 import { useShop } from "../lib/shop.tsx";
 import { useAsync } from "../lib/useAsync.ts";
+import { useWhitePage } from "../lib/useWhitePage.ts";
 import { Price } from "../components/Price.tsx";
 import { EmptyNotice, ErrorNotice, toast } from "../components/Feedback.tsx";
 import { openContact } from "../components/ContactSheet.tsx";
@@ -16,6 +17,7 @@ export function ProductDetail() {
   const { id = "" } = useParams();
   const { state, retry } = useAsync(() => api.getProduct(id), [id]);
   const shop = useShop();
+  useWhitePage();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -55,17 +57,22 @@ function FloatingTopBar() {
   const navigate = useNavigate();
   // 从列表点进来时返回上一页（保留筛选和滚动位置）；直接打开分享链接时回到首页。
   const goBack = () => (window.history.state?.idx > 0 ? navigate(-1) : navigate("/"));
-  const circle = "glass flex h-11 w-11 items-center justify-center rounded-full text-ink active:opacity-70";
+  const tap = "pointer-events-auto relative flex h-11 w-11 items-center justify-center active:opacity-70";
+  const circle = "glass flex h-9 w-9 items-center justify-center rounded-full text-ink";
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-30">
       <div className="pt-safe mx-auto flex max-w-shell items-center justify-between px-3 pt-3">
-        <button type="button" onClick={goBack} aria-label="返回" className={`pointer-events-auto ${circle}`}>
-          <BackIcon size={22} />
+        <button type="button" onClick={goBack} aria-label="返回" className={tap}>
+          <span className={circle}>
+            <BackIcon size={20} />
+          </span>
         </button>
-        <Link to="/cart" aria-label="购物车" className={`pointer-events-auto relative ${circle}`}>
-          <CartIcon size={21} />
-          <CartBadge className="-right-1 -top-1" />
+        <Link to="/cart" aria-label="购物车" className={tap}>
+          <span className={circle}>
+            <CartIcon size={19} />
+          </span>
+          <CartBadge className="right-0 top-0" />
         </Link>
       </div>
     </div>
@@ -149,7 +156,7 @@ function DetailBody({ product }: { product: Product }) {
           <button
             type="button"
             onClick={openContact}
-            className="ml-2 h-12 min-w-0 flex-1 rounded-full bg-brand text-[17px] font-semibold text-white active:bg-brand-dark"
+            className="ml-2 h-11 min-w-0 flex-1 rounded-full bg-brand text-[16px] font-semibold text-white active:bg-brand-dark"
           >
             缺货 · 联系店铺
           </button>
@@ -164,7 +171,7 @@ function DetailBody({ product }: { product: Product }) {
               toast(`已加入购物车：${quantity} ${product.unit}`);
               setQuantity(1);
             }}
-            className="ml-2 h-12 min-w-0 flex-1 rounded-full bg-brand text-[17px] font-semibold text-white active:bg-brand-dark"
+            className="ml-2 h-11 min-w-0 flex-1 rounded-full bg-brand text-[16px] font-semibold text-white active:bg-brand-dark"
           >
             加入购物车
           </button>
@@ -177,7 +184,7 @@ function DetailBody({ product }: { product: Product }) {
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="px-5 pt-8">
-      <h2 className="headline mb-3 text-[20px] font-semibold text-ink">{title}</h2>
+      <h2 className="headline mb-3 text-[22px] font-semibold text-ink">{title}</h2>
       {children}
     </section>
   );
@@ -194,13 +201,13 @@ function QuantityRow({
   onChange: (update: (current: number) => number) => void;
 }) {
   const clamp = (value: number) => Math.max(1, Math.min(MAX_QUANTITY, value));
-  const step = "flex h-11 w-11 items-center justify-center text-ink active:opacity-50 disabled:text-faint/60";
+  const step = "-my-1 flex h-11 w-10 items-center justify-center text-ink active:opacity-50 disabled:text-faint/60";
   return (
     <div className="mt-5 flex items-center justify-between border-t border-line pt-4">
       <span className="text-[16px] text-ink">
         数量<span className="ml-1 text-[13px] text-faint">（{unit}）</span>
       </span>
-      <div className="flex h-11 items-center overflow-hidden rounded-full bg-page">
+      <div className="flex h-9 items-center rounded-full bg-page">
         <button type="button" aria-label="减少数量" disabled={quantity <= 1} onClick={() => onChange((n) => clamp(n - 1))} className={step}>
           <MinusIcon size={18} />
         </button>
@@ -214,7 +221,7 @@ function QuantityRow({
             onChange(() => (digits === "" ? 1 : clamp(Number(digits))));
           }}
           onFocus={(event) => event.target.select()}
-          className="tabular h-11 w-12 bg-transparent text-center text-[17px] font-semibold focus:outline-none"
+          className="tabular h-9 w-10 bg-transparent text-center text-[16px] font-semibold focus:outline-none"
         />
         <button
           type="button"
