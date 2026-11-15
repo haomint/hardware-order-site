@@ -49,6 +49,10 @@ npm.cmd --prefix server start
 
 订单和提醒记录一起入库，后台每秒检查待发送的提醒。网络等临时错误最多重试三次，分别等待 30 秒、2 分钟和 10 分钟。未配置或确认无法发送时记录失败，订单仍可正常查看。
 
+配置 `NOTIFICATION_SMTP_HOST`、`NOTIFICATION_SMTP_PORT`、`NOTIFICATION_SMTP_USER`、`NOTIFICATION_SMTP_PASSWORD` 和 `NOTIFICATION_EMAIL_TO` 启用新订单备用邮件。密码使用邮箱服务商的 SMTP 授权码或应用专用密码。发件邮箱可用 `NOTIFICATION_EMAIL_FROM` 指定，默认使用 SMTP 账号。端口默认 465，使用 TLS。非 465 端口默认强制 STARTTLS，也可通过 `NOTIFICATION_SMTP_SECURITY` 明确选择 `tls` 或 `starttls`。
+
+企业微信重试用完或确认不可用时，后台尝试发送一封邮件。只有邮件配置时，新订单直接走邮件。后台手动重发按可用渠道顺序各尝试一次，单个渠道最多 10 秒，整轮最多 30 秒。邮件只含订单摘要，SMTP 接收后记为已发送。SMTP 结果未知时保留失败记录，由管理员决定是否再次重发。
+
 待联系订单从进入该状态起计时，默认满 120 分钟补发一次。可用 `ORDER_TIMEOUT_MINUTES` 调整时长，`ORDER_TIMEOUT_QUIET_START` 和 `ORDER_TIMEOUT_QUIET_END` 调整北京时间的静默时段，默认 21:00 至次日 08:00，起止相同表示全天可发送。静默时段结束后，仍待联系且已超时的订单会补发。
 
 超时提醒独立记账，重启后重新检查到期订单。首次调用企业微信发送接口后，未确认的发送在企业微信去重窗口内以相同内容恢复。超出恢复窗口仍未确认时，记录为送达未知，避免主动重复发送。真实送达需要企业微信配置正常。
