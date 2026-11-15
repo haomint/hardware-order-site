@@ -18,6 +18,7 @@ import { createImages } from "./images.ts";
 import { createOrders, createOrderSubmissionLimiter } from "./orders.ts";
 import { orderCsvDisposition, streamOrderCsv } from "./order-csv.ts";
 import { createOrderNotifications } from "./order-notifications.ts";
+import type { SendNotificationMail } from "./notification-email.ts";
 
 type NodeConnection = { incoming: IncomingMessage };
 type HttpEnv = {
@@ -130,11 +131,13 @@ function uploadQueue(): MiddlewareHandler<HttpEnv> {
   };
 }
 
-export function createApp(db: DatabaseSync, config: Config, now = Date.now, wecomRequest?: typeof fetch) {
+export function createApp(
+  db: DatabaseSync, config: Config, now = Date.now, wecomRequest?: typeof fetch, sendMail?: SendNotificationMail,
+) {
   const app = new Hono<HttpEnv>();
   const auth = createAuth(db, now);
   const catalog = createCatalog(db, now);
-  const notifications = createOrderNotifications(db, config.wecom, now, wecomRequest, config.orderTimeout);
+  const notifications = createOrderNotifications(db, config, now, wecomRequest, sendMail);
   const orders = createOrders(db, catalog.findPublicItem, now, notifications.enqueue);
   const adminOrders = createAdminOrders(db, now);
   const limitOrderSubmission = createOrderSubmissionLimiter(now);

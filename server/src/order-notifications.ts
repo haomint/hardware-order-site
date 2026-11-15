@@ -1,12 +1,15 @@
 import type { DatabaseSync } from "node:sqlite";
 import { notificationRetryTiming, type OrderReceipt } from "../../shared/index.ts";
+import type { Config } from "./config.ts";
 import { transaction } from "./db.ts";
 import { ApiFailure, OrderFailure } from "./errors.ts";
-import { createOrderTimeoutReminders, loadOrderTimeoutConfig } from "./order-timeout-reminders.ts";
-import { createWecomSender, loadWecomConfig, WecomFailure } from "./wecom.ts";
+import { createNotificationEmailSender, NotificationEmailFailure, type SendNotificationMail } from "./notification-email.ts";
+import { createOrderTimeoutReminders } from "./order-timeout-reminders.ts";
+import { createWecomSender, WecomFailure } from "./wecom.ts";
 
 const retryDelays = [30_000, 120_000, 600_000];
 
+type Channel = "wecom" | "email";
 type Job = {
   order_no: string;
   contact_name: string;
@@ -15,6 +18,7 @@ type Job = {
   status: string;
   last_attempt_no: number;
   manual_deadline_at: number | null;
+  next_channel: Channel;
 };
 
 const manualTimeout = notificationRetryTiming.maxProcessingSeconds * 1000;
@@ -41,17 +45,20 @@ function message(job: Job) {
 }
 
 export function createOrderNotifications(
-  db: DatabaseSync, config: ReturnType<typeof loadWecomConfig>, now: () => number, request?: typeof fetch,
-  orderTimeout = loadOrderTimeoutConfig({}),
+  db: DatabaseSync, config: Pick<Config, "wecom" | "notificationEmail" | "orderTimeout">,
+  now: () => number, request?: typeof fetch, sendMail?: SendNotificationMail,
 ) {
-  const send = config && createWecomSender(config, now, request);
-  const processTimeoutReminder = send && createOrderTimeoutReminders(db, orderTimeout, now, send);
+  const sendWecom = config.wecom && createWecomSender(config.wecom, now, request);
+  const sendEmail = config.notificationEmail && createNotificationEmailSender(config.notificationEmail, sendMail);
+  const available = sendWecom || sendEmail;
+  const firstChannel: Channel = sendWecom || !sendEmail ? "wecom" : "email";
+  const processTimeoutReminder = sendWecom && createOrderTimeoutReminders(db, config.orderTimeout, now, sendWecom);
   const insert = db.prepare(`
-    INSERT INTO order_notifications (order_no, status, next_attempt_at, failure_code)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO order_notifications (order_no, status, next_attempt_at, failure_code, next_channel)
+    VALUES (?, ?, ?, ?, ?)
   `);
   const selectJob = `
-    SELECT o.order_no, o.contact_name, o.phone, o.items_json, o.status, n.manual_deadline_at,
+    SELECT o.order_no, o.contact_name, o.phone, o.items_json, o.status, n.manual_deadline_at, n.next_channel,
       coalesce((SELECT max(a.attempt_no) FROM order_notification_attempts a WHERE a.order_no = o.order_no), 0)
         AS last_attempt_no
     FROM order_notifications n JOIN orders o ON n.order_no = o.order_no
@@ -66,13 +73,18 @@ export function createOrderNotifications(
     WHERE n.manual_deadline_at IS NOT NULL AND n.next_attempt_at <= ?
     ORDER BY n.manual_deadline_at LIMIT 1
   `);
+  const dueFallback = db.prepare(`
+    ${selectJob}
+    WHERE n.order_no = ? AND n.status = 'retrying' AND n.next_channel = 'email' AND n.next_attempt_at <= ?
+  `);
   const startAttempt = db.prepare(`
-    INSERT INTO order_notification_attempts (order_no, attempt_no, started_at) VALUES (?, ?, ?)
+    INSERT INTO order_notification_attempts (order_no, attempt_no, started_at, channel) VALUES (?, ?, ?, ?)
   `);
   const recordStart = db.prepare(`
     UPDATE order_notifications
     -- 手动重发开始后移出队列。进程中断时等截止时间记失败，避免重复发送。
-    SET last_attempt_at = ?, next_attempt_at = CASE WHEN manual_deadline_at IS NULL THEN next_attempt_at END
+    SET last_attempt_at = ?, next_channel = ?,
+      next_attempt_at = CASE WHEN manual_deadline_at IS NULL THEN next_attempt_at END
     WHERE order_no = ?
   `);
   const finishAttempt = db.prepare(`
@@ -83,12 +95,16 @@ export function createOrderNotifications(
     UPDATE order_notifications
     SET status = ?, next_attempt_at = ?, failure_code = ?, manual_deadline_at = NULL WHERE order_no = ?
   `);
+  const queueEmail = db.prepare(`
+    UPDATE order_notifications SET next_channel = 'email', next_attempt_at = ?, failure_code = ?
+    WHERE order_no = ?
+  `);
   const existingKey = db.prepare(`
     SELECT 1 FROM order_notification_retry_keys WHERE order_no = ? AND idempotency_key = ?
   `);
   const queueManual = db.prepare(`
     UPDATE order_notifications
-    SET status = 'retrying', next_attempt_at = ?, manual_deadline_at = ?, failure_code = NULL
+    SET status = 'retrying', next_attempt_at = ?, manual_deadline_at = ?, failure_code = NULL, next_channel = ?
     WHERE order_no = ? AND status = 'failed'
   `);
   const saveKey = db.prepare("INSERT INTO order_notification_retry_keys VALUES (?, ?)");
@@ -116,51 +132,75 @@ export function createOrderNotifications(
     });
   }
 
-  async function processNext() {
+  async function processAttempt(fallbackOrderNo?: string): Promise<string | undefined> {
     const job = transaction(db, () => {
       const startedAt = now();
-      const next = (dueManual.get(startedAt) ?? due.get(startedAt)) as Job | undefined;
+      const next = (fallbackOrderNo
+        ? dueFallback.get(fallbackOrderNo, startedAt)
+        : dueManual.get(startedAt) ?? due.get(startedAt)) as Job | undefined;
       if (!next) return undefined;
-      if (next.last_attempt_no > 0) {
-        // 重启后补记中断的尝试。该次仍占用重试额度。
-        finishAttempt.run(startedAt, "WECOM_INTERRUPTED", next.order_no, next.last_attempt_no);
-      }
-      if (!send || (next.manual_deadline_at === null && next.last_attempt_no > retryDelays.length)) {
-        updateStatus.run("failed", null, send ? "WECOM_INTERRUPTED" : "WECOM_NOT_CONFIGURED", next.order_no);
+      const { order_no, manual_deadline_at, last_attempt_no } = next;
+      if (manual_deadline_at !== null && startedAt >= manual_deadline_at) {
+        updateStatus.run("failed", null, "NOTIFICATION_DEADLINE_EXCEEDED", order_no);
         return undefined;
       }
-      startAttempt.run(next.order_no, next.last_attempt_no + 1, startedAt);
-      recordStart.run(startedAt, next.order_no);
-      return next;
+      const interrupted = next.next_channel === "email" ? "EMAIL_INTERRUPTED" : "WECOM_INTERRUPTED";
+      const recovered = last_attempt_no > 0 && finishAttempt.run(startedAt, interrupted, order_no, last_attempt_no).changes;
+      let channel = next.next_channel;
+      if (channel === "wecom" && (!sendWecom || (manual_deadline_at === null && last_attempt_no > retryDelays.length))) {
+        if (!sendEmail) {
+          updateStatus.run("failed", null, sendWecom ? interrupted : "WECOM_NOT_CONFIGURED", order_no);
+          return undefined;
+        }
+        channel = "email";
+      } else if (channel === "email" && (!sendEmail || recovered)) {
+        // 重启时无法确定 SMTP 是否已接收已开始的邮件，保留失败记录等待管理员决定。
+        updateStatus.run("failed", null, recovered ? interrupted : "EMAIL_NOT_CONFIGURED", order_no);
+        return undefined;
+      }
+      startAttempt.run(order_no, last_attempt_no + 1, startedAt, channel);
+      recordStart.run(startedAt, channel, order_no);
+      return { ...next, channel };
     });
-    if (!job || !send) return;
+    if (!job) return;
 
     const attempt = job.last_attempt_no + 1;
-    let failure: WecomFailure | undefined;
+    let failure: Error | undefined;
     try {
       const remaining = job.manual_deadline_at === null ? channelTimeout : job.manual_deadline_at - now();
       if (remaining <= 0) throw new WecomFailure("NOTIFICATION_DEADLINE_EXCEEDED", false);
-      await send(message(job), AbortSignal.timeout(Math.min(channelTimeout, remaining)));
+      const signal = AbortSignal.timeout(Math.min(channelTimeout, remaining));
+      const text = message(job);
+      if (job.channel === "wecom") await sendWecom!(text, signal);
+      else await sendEmail!(job.order_no, text, signal);
     } catch (error) {
-      failure = error instanceof WecomFailure ? error : new WecomFailure("WECOM_INTERNAL_ERROR", false);
+      failure = error instanceof WecomFailure || error instanceof NotificationEmailFailure
+        ? error
+        : new Error(job.channel === "wecom" ? "WECOM_INTERNAL_ERROR" : "EMAIL_INTERNAL_ERROR");
     }
-    transaction(db, () => {
+    return transaction(db, () => {
       const finishedAt = now();
       if (job.manual_deadline_at !== null && finishedAt >= job.manual_deadline_at) {
         failure = new WecomFailure("NOTIFICATION_DEADLINE_EXCEEDED", false);
       }
       const code = failure?.message ?? null;
-      const delay = job.manual_deadline_at === null ? retryDelays[attempt - 1] : undefined;
-      const nextAttempt = failure?.retryable && delay !== undefined ? finishedAt + delay : null;
+      const delay = job.channel === "wecom" && job.manual_deadline_at === null ? retryDelays[attempt - 1] : undefined;
+      const nextAttempt = failure instanceof WecomFailure && failure.retryable && delay !== undefined
+        ? finishedAt + delay : null;
       // 可能已达到截止时间，旧请求返回时不得覆盖新一轮重发。
       if (!finishAttempt.run(finishedAt, code, job.order_no, attempt).changes) return;
+      if (failure && job.channel === "wecom" && sendEmail && nextAttempt === null && code !== "NOTIFICATION_DEADLINE_EXCEEDED") {
+        queueEmail.run(finishedAt, code, job.order_no);
+        return job.order_no;
+      }
       const status = !failure ? "sent" : nextAttempt === null ? "failed" : "retrying";
       updateStatus.run(status, nextAttempt, code, job.order_no);
     });
   }
 
   async function processNotifications() {
-    await processNext();
+    const fallback = await processAttempt();
+    if (fallback) await processAttempt(fallback);
     await processTimeoutReminder?.();
   }
 
@@ -171,7 +211,7 @@ export function createOrderNotifications(
       transaction(db, () => {
         if (existingKey.get(orderNo, idempotencyKey)) return;
         const acceptedAt = now();
-        if (!queueManual.run(acceptedAt, acceptedAt + manualTimeout, orderNo).changes) {
+        if (!queueManual.run(acceptedAt, acceptedAt + manualTimeout, firstChannel, orderNo).changes) {
           if (!existingOrder.get(orderNo)) throw new OrderFailure("ORDER_NOT_FOUND");
           throw new ApiFailure("NOTIFICATION_NOT_RETRYABLE");
         }
@@ -179,8 +219,8 @@ export function createOrderNotifications(
       });
     },
     enqueue(orderNo: string, createdAt: number) {
-      insert.run(orderNo, send ? "retrying" : "failed", send ? createdAt : null,
-        send ? null : "WECOM_NOT_CONFIGURED");
+      insert.run(orderNo, available ? "retrying" : "failed", available ? createdAt : null,
+        available ? null : "WECOM_NOT_CONFIGURED", firstChannel);
     },
     async processDue() {
       expireManual();

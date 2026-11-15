@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
@@ -13,22 +14,27 @@ import { setAdministrator } from "../src/auth.ts";
 import { loadConfig } from "../src/config.ts";
 import { openDatabase } from "../src/db.ts";
 import { createApp } from "../src/http.ts";
+import { createNotificationEmailSender, loadNotificationEmailConfig, type SendNotificationMail } from "../src/notification-email.ts";
 import { createWecomSender } from "../src/wecom.ts";
 
 const env = {
   WECOM_CORP_ID: "test-corp", WECOM_AGENT_ID: "1000002", WECOM_SECRET: "test-secret", WECOM_USER_ID: "test-owner",
 };
+const mailEnv = {
+  NOTIFICATION_SMTP_HOST: "smtp.example.test", NOTIFICATION_SMTP_USER: "sender@example.test",
+  NOTIFICATION_SMTP_PASSWORD: "test-smtp-password", NOTIFICATION_EMAIL_TO: "owner@example.test",
+};
 const tokenResponse = (token = "test-token") => Response.json({ errcode: 0, access_token: token, expires_in: 7200 });
 const origin = "http://localhost:5173";
 const collection = "/api/admin/orders";
 
-function fixture(t: TestContext, request: typeof fetch, variables: NodeJS.ProcessEnv = env) {
+function fixture(t: TestContext, request: typeof fetch, variables: NodeJS.ProcessEnv = env, sendMail?: SendNotificationMail) {
   const dir = mkdtempSync(join(tmpdir(), "hardware-notifications-"));
   const db = openDatabase(join(dir, "orders.sqlite"));
   let time = Date.parse("2026-11-13T05:00:00Z");
   const now = () => time;
   const config = loadConfig({ ...variables, UPLOAD_DIR: join(dir, "uploads") });
-  const build = () => createApp(db, config, now, request);
+  const build = () => createApp(db, config, now, request, sendMail);
   const { app, notifications } = build();
   t.after(() => {
     db.close();
@@ -296,6 +302,173 @@ test("网络失败最多自动重试三次，结果入库，重建处理器后�
   assert.equal(calls, 4);
   assert.deepEqual(f.attempts().map((attempt) => attempt.failure_code), Array(4).fill("WECOM_REQUEST_FAILED"));
   assert.equal(f.db.prepare("SELECT count(*) AS count FROM orders").get()?.count, 1);
+});
+
+test("企业微信用完三次重试才发送备用邮件，邮件没有完整联系方式和密钥", async (t) => {
+  let wecomCalls = 0;
+  const emails: Parameters<SendNotificationMail>[0][] = [];
+  const f = fixture(t, async () => {
+    wecomCalls++;
+    throw new Error("temporary");
+  }, { ...env, ...mailEnv }, async (message) => {
+    assert.equal(f.db.isTransaction, false);
+    emails.push(message);
+    return { accepted: [mailEnv.NOTIFICATION_EMAIL_TO] };
+  });
+  const order = await submittedOrder(f);
+  await f.notifications.processDue();
+  assert.equal(emails.length, 0);
+  for (const delay of [30_000, 120_000, 600_000]) {
+    assert.equal(emails.length, 0);
+    f.advance(delay);
+    await f.build().notifications.processDue();
+  }
+  assert.equal(wecomCalls, 4);
+  assert.equal(emails.length, 1);
+  const [email] = emails;
+  assert.equal(email.to, mailEnv.NOTIFICATION_EMAIL_TO);
+  assert.equal(email.subject, `新订货单 #${order.orderNo}`);
+  const text = String(email.text);
+  assert.match(text, /张师傅｜尾号：5678/);
+  assert.match(text, /电钻 ×1、钻头 ×2、锤子 ×3 等 4 类/);
+  assert.doesNotMatch(text, /13812345678|测试配送地址|test-smtp-password|test-secret|张三|扳手/);
+  assert.ok(email.signal instanceof AbortSignal);
+  assert.equal(f.record()?.status, "sent");
+  await f.build().notifications.processDue();
+  assert.equal(emails.length, 1);
+  assert.deepEqual(f.attempts().map(({ channel, failure_code }) => [channel, failure_code]),
+    [...Array.from({ length: 4 }, () => ["wecom", "WECOM_REQUEST_FAILED"]), ["email", null]]);
+});
+
+test("企业微信正常时不发备用邮件，仅配置邮件时可直接发送", async (t) => {
+  let emailCalls = 0;
+  const sendMail: SendNotificationMail = async () => {
+    emailCalls++;
+    return { accepted: [mailEnv.NOTIFICATION_EMAIL_TO] };
+  };
+  const primary = fixture(t, async (input) => String(input).includes("/gettoken") ? tokenResponse()
+    : Response.json({ errcode: 0 }), { ...env, ...mailEnv }, sendMail);
+  await submittedOrder(primary);
+  await primary.notifications.processDue();
+  assert.equal(primary.record()?.status, "sent");
+  assert.equal(emailCalls, 0);
+
+  const emailOnly = fixture(t, async () => { assert.fail("unexpected WeCom call"); }, mailEnv, sendMail);
+  await submittedOrder(emailOnly);
+  await emailOnly.notifications.processDue();
+  assert.equal(emailCalls, 1);
+  assert.equal(emailOnly.record()?.status, "sent");
+  assert.equal(emailOnly.attempts()[0].channel, "email");
+});
+
+test("手动重发按顺序各试一次，同一幂等键不会重发邮件", async (t) => {
+  let wecomCalls = 0;
+  let emailCalls = 0;
+  const f = fixture(t, async (input) => {
+    if (String(input).includes("/gettoken")) return tokenResponse();
+    return Response.json({ errcode: ++wecomCalls === 1 ? 60020 : -1 });
+  }, { ...env, ...mailEnv }, async () => {
+    if (++emailCalls === 1) throw Object.assign(new Error("server echoed test-smtp-password"), { responseCode: 535 });
+    return { accepted: [mailEnv.NOTIFICATION_EMAIL_TO] };
+  });
+  const order = await submittedOrder(f);
+  await f.notifications.processDue();
+  assert.equal(f.record()?.status, "failed");
+  assert.equal(f.record()?.failure_code, "EMAIL_SMTP_535");
+  const cookie = await adminCookie(f);
+  const path = `${collection}/${order.orderNo}/notifications/retry`;
+  const headers = { Cookie: cookie, Origin: origin, "Idempotency-Key": randomUUID() };
+  const retry = () => f.app.request(path, { method: "POST", headers });
+  assert.equal((await detail(await retry(), 202)).notificationStatus, "retrying");
+  await f.notifications.processDue();
+  const sent = await detail(await retry(), 202);
+  assert.equal(sent.notificationStatus, "sent");
+  assert.equal(sent.updatedAt, sent.createdAt);
+  assert.equal(wecomCalls, 2);
+  assert.equal(emailCalls, 2);
+  assert.deepEqual(f.attempts().map(({ channel, failure_code }) => [channel, failure_code]),
+    [["wecom", "WECOM_60020"], ["email", "EMAIL_SMTP_535"], ["wecom", "WECOM_-1"], ["email", null]]);
+});
+
+test("超过手动重发总时限时不启动邮件发送", async (t) => {
+  let manual = false;
+  let emailCalls = 0;
+  const f = fixture(t, async (input) => {
+    if (String(input).includes("/gettoken")) return tokenResponse();
+    if (manual) f.advance(notificationRetryTiming.maxProcessingSeconds * 1000);
+    return Response.json({ errcode: 60020 });
+  }, { ...env, ...mailEnv }, async () => {
+    emailCalls++;
+    return { accepted: [] };
+  });
+  const order = await submittedOrder(f);
+  await f.notifications.processDue();
+  assert.equal(emailCalls, 1);
+  assert.equal(f.record()?.failure_code, "EMAIL_RECIPIENT_REJECTED");
+  const cookie = await adminCookie(f);
+  const headers = { Cookie: cookie, Origin: origin, "Idempotency-Key": randomUUID() };
+  const path = `${collection}/${order.orderNo}/notifications/retry`;
+  assert.equal((await f.app.request(path, { method: "POST", headers })).status, 202);
+  manual = true;
+  await f.notifications.processDue();
+  assert.equal(f.record()?.status, "failed");
+  assert.equal(f.record()?.failure_code, "NOTIFICATION_DEADLINE_EXCEEDED");
+  assert.equal(emailCalls, 1);
+});
+
+test("重启后继续排队的备用邮件，已开始送达的邮件不自动重投", async (t) => {
+  let emailCalls = 0;
+  const f = fixture(t, async () => { assert.fail("unexpected WeCom call"); }, mailEnv, async () => {
+    emailCalls++;
+    return { accepted: [mailEnv.NOTIFICATION_EMAIL_TO] };
+  });
+  const queued = await submittedOrder(f);
+  const interrupted = await submittedOrder(f, randomUUID());
+  f.db.prepare("INSERT INTO order_notification_attempts (order_no, attempt_no, started_at, channel) VALUES (?, 1, ?, 'email')")
+    .run(interrupted.orderNo, Date.parse(interrupted.createdAt));
+  await f.build().notifications.processDue();
+  await f.build().notifications.processDue();
+  const status = f.db.prepare("SELECT status, failure_code FROM order_notifications WHERE order_no = ?");
+  assert.equal(status.get(queued.orderNo)?.status, "sent");
+  assert.equal(status.get(interrupted.orderNo)?.status, "failed");
+  assert.equal(status.get(interrupted.orderNo)?.failure_code, "EMAIL_INTERRUPTED");
+  assert.equal(emailCalls, 1);
+});
+
+test("SMTP 不支持 STARTTLS 时，服务端不会发送登录凭据", async (t) => {
+  const commands: string[] = [];
+  const smtp = createServer((socket) => {
+    socket.setEncoding("ascii");
+    socket.write("220 local.example.test ESMTP\r\n");
+    let pending = "";
+    socket.on("data", (chunk: string) => {
+      const lines = (pending + chunk).split("\r\n");
+      pending = lines.pop() ?? "";
+      for (const line of lines) {
+        commands.push(line);
+        if (line.startsWith("EHLO ")) socket.write("250 local.example.test\r\n");
+        else socket.end("454 TLS unavailable\r\n");
+      }
+    });
+  });
+  const port = await new Promise<number>((resolve, reject) => {
+    smtp.once("error", reject);
+    smtp.listen(0, "127.0.0.1", () => {
+      const address = smtp.address();
+      if (address && typeof address !== "string") resolve(address.port);
+      else reject(new Error("SMTP 测试服务未绑定端口。"));
+    });
+  });
+  t.after(() => new Promise<void>((closed) => smtp.close(() => closed())));
+  const config = loadNotificationEmailConfig({
+    ...mailEnv, NOTIFICATION_SMTP_HOST: "127.0.0.1", NOTIFICATION_SMTP_PORT: String(port),
+    NOTIFICATION_SMTP_SECURITY: "starttls",
+  });
+  assert.ok(config);
+  const send = createNotificationEmailSender(config);
+  await assert.rejects(send("WJ-20261113-0001", "测试摘要", AbortSignal.timeout(3000)), /EMAIL_SMTP_454/);
+  assert.ok(commands.includes("STARTTLS"));
+  assert.ok(!commands.some((command) => /^(AUTH|MAIL FROM)/.test(command)));
 });
 
 test("缺少配置直接记失败，企业可信 IP 错误只记录错误码", async (t) => {
