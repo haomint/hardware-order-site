@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { AdminWriteOriginSchema, ShopSchema } from "../../shared/index.ts";
+import { AdminWriteOriginSchema } from "../../shared/index.ts";
 import { loadWecomConfig } from "./wecom.ts";
 import { loadNotificationEmailConfig } from "./notification-email.ts";
 import { loadOrderTimeoutConfig } from "./order-timeout-reminders.ts";
@@ -42,11 +42,11 @@ export function loadConfig(env = process.env) {
     wecom: loadWecomConfig(env),
     notificationEmail: loadNotificationEmailConfig(env),
     orderTimeout: loadOrderTimeoutConfig(env),
-    shop: ShopSchema.parse({
+    shopDefaults: {
       name: env.SHOP_NAME ?? "威马五金",
       phone: env.SHOP_PHONE ?? "",
       wechatContactText: env.SHOP_WECHAT_CONTACT_TEXT ?? "",
-    }),
+    },
   };
 }
 

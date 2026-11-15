@@ -12,7 +12,7 @@ npm.cmd --prefix server ci
 Copy-Item server/.env.example server/.env
 ```
 
-按需填写 `server/.env` 的店铺资料。首次运行以下命令设置管理员账号，之后也可用同一命令重置密码并注销旧会话：
+按需填写 `server/.env` 的店铺资料。每个数据库首次启动时用 `SHOP_NAME`、`SHOP_PHONE` 和 `SHOP_WECHAT_CONTACT_TEXT` 初始化，之后以后台「店铺资料」保存的值为准。首次运行以下命令设置管理员账号，之后也可用同一命令重置密码并注销旧会话：
 
 ```powershell
 $env:ADMIN_USERNAME = Read-Host '管理员账号'

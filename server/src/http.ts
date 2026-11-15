@@ -18,6 +18,7 @@ import { createImages } from "./images.ts";
 import { createOrders, createOrderSubmissionLimiter } from "./orders.ts";
 import { orderCsvDisposition, streamOrderCsv } from "./order-csv.ts";
 import { createOrderNotifications } from "./order-notifications.ts";
+import { createShopSettings } from "./shop-settings.ts";
 import type { SendNotificationMail } from "./notification-email.ts";
 
 type NodeConnection = { incoming: IncomingMessage };
@@ -135,6 +136,7 @@ export function createApp(
   db: DatabaseSync, config: Config, now = Date.now, wecomRequest?: typeof fetch, sendMail?: SendNotificationMail,
 ) {
   const app = new Hono<HttpEnv>();
+  const shop = createShopSettings(db, config.shopDefaults);
   const auth = createAuth(db, now);
   const catalog = createCatalog(db, now);
   const notifications = createOrderNotifications(db, config, now, wecomRequest, sendMail);
@@ -227,7 +229,9 @@ export function createApp(
     });
   }
 
-  add(stageA.getShop, () => config.shop);
+  add(stageA.getShop, shop.get);
+  add(stageA.getAdminShop, shop.get);
+  add(stageA.updateAdminShop, ({ body }) => shop.patch(body));
   add(stageA.listCategories, () => catalog.listCategories(false));
   add(stageA.listProducts, ({ query }) => catalog.listProducts(query));
   add(stageA.getProduct, ({ params }) => catalog.getProduct(params.id.toLowerCase()));
