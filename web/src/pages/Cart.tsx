@@ -15,6 +15,7 @@ import {
 import type { CartLine } from "../lib/cart.ts";
 import { brandModel, formatYuan } from "../lib/format.ts";
 import { useShop } from "../lib/shop.tsx";
+import { useWhitePage } from "../lib/useWhitePage.ts";
 import { ErrorNotice, toast } from "../components/Feedback.tsx";
 import { TabBar } from "../components/TabBar.tsx";
 import { CartIcon, CloseIcon, MinusIcon, PlusIcon } from "../components/icons.tsx";
@@ -27,6 +28,7 @@ const UNDO_MS = 5000;
 
 export function Cart() {
   const shop = useShop();
+  useWhitePage();
   const navigate = useNavigate();
   const lines = useCart();
   const [info, setInfo] = useState<Map<string, LookupItem>>(new Map());
@@ -114,15 +116,20 @@ export function Cart() {
   const bottomOffset = "calc(var(--tabbar-h) + var(--safe-bottom))";
 
   return (
-    <div className="mx-auto min-h-screen max-w-shell" style={{ paddingBottom: lines.length ? `calc(var(--tabbar-h) + var(--safe-bottom) + ${barHeight + 16}px)` : undefined }}>
-      <header className="sticky top-0 z-30 bg-page/95 px-4 pb-3 pt-4">
-        <h1 className="text-[22px] font-extrabold text-ink">
-          购物车
-          {lines.length > 0 && <span className="ml-2 text-[15px] font-medium text-muted">共 {lines.length} 种</span>}
-        </h1>
+    <div
+      className="mx-auto flex min-h-screen max-w-shell flex-col bg-surface"
+      style={{
+        paddingBottom: lines.length
+          ? `calc(var(--tabbar-h) + var(--safe-bottom) + ${barHeight + 16}px)`
+          : "calc(var(--tabbar-h) + var(--safe-bottom))",
+      }}
+    >
+      <header className="flex items-baseline gap-2 px-5 pb-2 pt-5">
+        <h1 className="headline text-[30px] font-semibold leading-tight text-ink">购物车</h1>
+        {lines.length > 0 && <span className="text-[15px] text-muted">共 {lines.length} 种</span>}
       </header>
 
-      <main className="space-y-3 px-4">
+      <main className="flex flex-1 flex-col px-5">
         {lines.length === 0 ? (
           <EmptyCart />
         ) : error && pending.length > 0 ? (
@@ -130,15 +137,15 @@ export function Cart() {
         ) : (
           <>
             {blocked.length > 0 && (
-              <section className="overflow-hidden rounded-card bg-surface shadow-card" aria-labelledby="blocked-title">
-                <div className="flex items-center justify-between gap-2 bg-amber-50 px-4 py-2.5">
-                  <h2 id="blocked-title" className="text-[15px] font-bold text-amber-900">
+              <section className="mb-4 rounded-card bg-page px-4 pt-1" aria-labelledby="blocked-title">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 id="blocked-title" className="text-[15px] font-semibold text-ink">
                     以下商品暂时无法订购
                   </h2>
                   <button
                     type="button"
                     onClick={() => blocked.forEach((row) => removeFromCart(row.line.productId))}
-                    className="flex min-h-tap items-center text-[14px] font-medium text-amber-900 underline underline-offset-2"
+                    className="flex min-h-tap items-center text-[15px] text-brand"
                   >
                     全部移除
                   </button>
@@ -152,7 +159,7 @@ export function Cart() {
             )}
 
             {ready.length > 0 && (
-              <ul className="space-y-3">
+              <ul>
                 {ready.map((row) => (
                   <ReadyRow key={row.line.productId} row={row} onRemove={() => remove(row.line.productId)} />
                 ))}
@@ -160,10 +167,10 @@ export function Cart() {
             )}
 
             {pending.length > 0 && (
-              <ul className="space-y-3" aria-hidden="true">
+              <ul aria-hidden="true">
                 {pending.map((row) => (
-                  <li key={row.line.productId} className="flex gap-3 rounded-card bg-surface p-3 shadow-card">
-                    <div className="skeleton h-20 w-20 shrink-0 rounded-xl" />
+                  <li key={row.line.productId} className="flex gap-3.5 border-b border-line py-4">
+                    <div className="skeleton h-20 w-20 shrink-0 rounded-2xl" />
                     <div className="flex-1 space-y-2 py-1">
                       <div className="skeleton h-4 w-4/5" />
                       <div className="skeleton h-3 w-1/2" />
@@ -180,7 +187,7 @@ export function Cart() {
       {/* 撤销移除 */}
       {undo && (
         <div className="fixed inset-x-0 z-40 px-4" style={{ bottom: `calc(${bottomOffset} + ${barHeight + 8}px)` }}>
-          <div className="animate-fade mx-auto flex max-w-shell items-center justify-between gap-3 rounded-control bg-ink/90 py-1 pl-4 pr-1 text-white shadow-float">
+          <div className="animate-fade mx-auto flex max-w-shell items-center justify-between gap-3 rounded-2xl bg-ink/90 py-1 pl-4 pr-1 text-white shadow-float">
             <span className="min-w-0 truncate text-[15px]">已移除「{undo.line.name ?? "商品"}」</span>
             <button
               type="button"
@@ -189,7 +196,7 @@ export function Cart() {
                 setUndo(null);
                 window.clearTimeout(undoTimer.current);
               }}
-              className="flex min-h-tap shrink-0 items-center rounded-control px-4 text-[15px] font-bold text-[#ffd56b] active:bg-white/10"
+              className="flex min-h-tap shrink-0 items-center rounded-xl px-4 text-[15px] font-semibold text-[#4da3ff] active:bg-white/10"
             >
               撤销
             </button>
@@ -199,32 +206,31 @@ export function Cart() {
 
       {/* 结算栏：在底部导航上方 */}
       {lines.length > 0 && (
-        <div ref={barRef} className="fixed inset-x-0 z-30 border-t border-line/70 bg-surface shadow-bar" style={{ bottom: bottomOffset }}>
-          <div className="mx-auto max-w-shell px-4 pb-3 pt-2.5">
+        <div ref={barRef} className="glass fixed inset-x-0 z-30 shadow-bar" style={{ bottom: bottomOffset }}>
+          <div className="mx-auto max-w-shell px-5 pb-3 pt-3">
             {blocked.length > 0 && (
-              <p className="mb-2 rounded-lg bg-amber-50 px-3 py-1.5 text-[13px] text-amber-900">请先移除暂时无法订购的商品，再提交订货单</p>
+              <p className="mb-2 rounded-xl bg-page px-3 py-1.5 text-[13px] text-ink">请先移除暂时无法订购的商品，再提交订货单</p>
             )}
             <div className="flex items-end justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[13px] text-muted">
-                  预估商品金额<span className="text-faint">（不含待确认运费）</span>
+                  预估商品金额
                 </p>
-                <p className="tabular text-accent">
-                  <span className="text-[15px] font-bold">¥</span>
-                  <span className="text-[26px] font-extrabold leading-tight">{pending.length ? "--" : formatYuan(totalCents)}</span>
+                <p className="tabular headline text-[24px] font-semibold leading-tight text-ink">
+                  {pending.length ? "--" : `¥${formatYuan(totalCents)}`}
                 </p>
               </div>
               <button
                 type="button"
                 disabled={!canSubmit}
                 onClick={() => navigate("/checkout")}
-                className="bg-accent-gradient h-12 shrink-0 rounded-full px-6 text-[16px] font-bold text-white shadow-accent disabled:bg-none disabled:bg-line disabled:text-faint disabled:shadow-none"
+                className="h-11 shrink-0 rounded-full bg-brand px-6 text-[16px] font-semibold text-white active:bg-brand-dark disabled:bg-page disabled:text-faint"
               >
                 去提交订货单
               </button>
             </div>
             <p className="mt-1 text-[12px] leading-snug text-faint">
-              {hasNegotiable && "不含面议商品。"}最终金额以商家联系确认为准
+              {hasNegotiable ? "不含面议商品和待确认运费，" : "不含待确认运费，"}最终金额以商家联系确认为准
             </p>
           </div>
         </div>
@@ -243,19 +249,19 @@ function ReadyRow({ row, onRemove }: { row: Row; onRemove: () => void }) {
   const subtotal = product.priceCents === null ? null : product.priceCents * line.quantity;
 
   return (
-    <li className="relative rounded-card bg-surface p-3 shadow-card">
-      <div className="flex gap-3">
-        <Link to={`/p/${product.id}`} className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-line bg-white">
-          <img src={product.mainImage.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-contain" />
+    <li className="relative border-b border-line py-4 last:border-b-0">
+      <div className="flex gap-3.5">
+        <Link to={`/p/${product.id}`} className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-page">
+          <img src={product.mainImage.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-contain p-1.5 mix-blend-multiply" />
         </Link>
         <div className="min-w-0 flex-1 pr-8">
-          <Link to={`/p/${product.id}`} className="line-clamp-2 text-[15px] font-semibold leading-snug text-ink">
+          <Link to={`/p/${product.id}`} className="line-clamp-2 text-[16px] font-semibold leading-snug text-ink">
             {product.name}
           </Link>
           {sub && <p className="mt-0.5 truncate text-[13px] text-muted">{sub}</p>}
           <p className="mt-1 text-[13px] text-muted">
             {product.priceCents === null ? (
-              <span className="font-semibold text-brand">价格面议</span>
+              <span className="text-ink">价格面议</span>
             ) : (
               <>
                 参考价 <span className="tabular text-ink">¥{formatYuan(product.priceCents)}</span>/{product.unit}
@@ -269,18 +275,18 @@ function ReadyRow({ row, onRemove }: { row: Row; onRemove: () => void }) {
         type="button"
         onClick={onRemove}
         aria-label={`移除 ${product.name}`}
-        className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center text-faint active:text-ink"
+        className="absolute -right-2.5 top-2 flex h-11 w-11 items-center justify-center text-faint active:text-ink"
       >
         <CloseIcon size={18} />
       </button>
 
-      <div className="mt-2 flex items-center justify-between gap-3 border-t border-line pt-2">
+      <div className="mt-3 flex items-center justify-between gap-3 pl-[94px]">
         <p className="min-w-0 text-[14px] text-muted">
           小计{" "}
           {subtotal === null ? (
-            <span className="font-semibold text-brand">面议</span>
+            <span className="text-ink">面议</span>
           ) : (
-            <span className="tabular text-[16px] font-bold text-accent">¥{formatYuan(subtotal)}</span>
+            <span className="tabular text-[17px] font-semibold text-ink">¥{formatYuan(subtotal)}</span>
           )}
         </p>
         <QuantityStepper productId={line.productId} quantity={line.quantity} unit={product.unit} />
@@ -296,22 +302,22 @@ function BlockedRow({ row, onRemove }: { row: Row; onRemove: () => void }) {
   const reason = item?.availability === "out_of_stock" ? "暂时缺货" : "已下架";
 
   return (
-    <li className="flex items-center gap-3 px-4 py-3">
-      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-line bg-page">
+    <li className="flex items-center gap-3 py-3">
+      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-surface">
         {/* 已下架的商品图片可能已被清理，只显示缺货商品的图片 */}
         {product && <img src={product.mainImage.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-contain opacity-50 grayscale" />}
       </div>
       <div className="min-w-0 flex-1">
         <p className="line-clamp-2 text-[15px] leading-snug text-muted">{name}</p>
         <p className="mt-0.5 text-[13px]">
-          <span className="rounded bg-ink/70 px-1.5 py-0.5 text-[12px] text-white">{reason}</span>
+          <span className="rounded-full bg-surface px-2 py-0.5 text-[12px] text-muted">{reason}</span>
           <span className="ml-2 text-faint">×{line.quantity}</span>
         </p>
       </div>
       <button
         type="button"
         onClick={onRemove}
-        className="flex min-h-tap shrink-0 items-center rounded-full border border-line px-4 text-[14px] font-medium text-ink active:bg-page"
+        className="flex min-h-tap shrink-0 items-center px-2 text-[15px] text-brand active:opacity-60"
       >
         移除
       </button>
@@ -321,7 +327,7 @@ function BlockedRow({ row, onRemove }: { row: Row; onRemove: () => void }) {
 
 function QuantityStepper({ productId, quantity, unit }: { productId: string; quantity: number; unit: string }) {
   const [draft, setDraft] = useState<string | null>(null);
-  const step = "flex h-10 w-10 items-center justify-center text-ink active:bg-page disabled:text-faint/50";
+  const step = "-my-1 flex h-11 w-10 items-center justify-center text-ink active:opacity-50 disabled:text-faint/50";
 
   const commit = (text: string) => {
     const digits = text.replace(/\D/g, "");
@@ -330,7 +336,7 @@ function QuantityStepper({ productId, quantity, unit }: { productId: string; qua
   };
 
   return (
-    <div className="flex h-10 shrink-0 items-center overflow-hidden rounded-full border border-line" role="group" aria-label={`数量（${unit}）`}>
+    <div className="flex h-9 shrink-0 items-center rounded-full bg-page" role="group" aria-label={`数量（${unit}）`}>
       <button type="button" aria-label="减少数量" disabled={quantity <= 1} onClick={() => changeQuantity(productId, -1)} className={step}>
         <MinusIcon size={16} />
       </button>
@@ -347,7 +353,7 @@ function QuantityStepper({ productId, quantity, unit }: { productId: string; qua
         onFocus={(event) => event.target.select()}
         onBlur={(event) => commit(event.target.value)}
         onKeyDown={(event) => event.key === "Enter" && (event.target as HTMLInputElement).blur()}
-        className="tabular h-10 w-12 border-x border-line bg-transparent text-center text-[16px] font-semibold focus:outline-none"
+        className="tabular h-9 w-11 bg-transparent text-center text-[16px] font-semibold focus:outline-none"
       />
       <button
         type="button"
@@ -364,15 +370,15 @@ function QuantityStepper({ productId, quantity, unit }: { productId: string; qua
 
 function EmptyCart() {
   return (
-    <div className="flex flex-col items-center px-6 py-16 text-center">
-      <span className="flex h-20 w-20 items-center justify-center rounded-full bg-brand-soft text-brand">
-        <CartIcon size={38} strokeWidth={1.6} />
+    <div className="flex flex-1 flex-col items-center justify-center px-6 pb-20 text-center">
+      <span className="flex h-20 w-20 items-center justify-center rounded-full bg-page text-faint">
+        <CartIcon size={38} strokeWidth={1.5} />
       </span>
-      <p className="mt-4 text-[17px] font-semibold text-ink">购物车还是空的</p>
-      <p className="mt-1 text-[14px] text-muted">挑选好商品后，在这里提交订货单</p>
+      <p className="headline mt-5 text-[22px] font-semibold text-ink">购物车还是空的</p>
+      <p className="mt-1.5 text-[15px] text-muted">挑选好商品后，在这里提交订货单</p>
       <Link
         to="/"
-        className="bg-brand-gradient mt-6 inline-flex min-h-tap items-center rounded-full px-8 text-[16px] font-bold text-white shadow-brand"
+        className="mt-6 inline-flex min-h-tap items-center rounded-full bg-brand px-8 text-[16px] font-semibold text-white active:bg-brand-dark"
       >
         去选购
       </Link>
