@@ -10,11 +10,11 @@ export function Art({ name, className = "" }: { name: ArtName; className?: strin
 
 /** 分类图标：按分类名称自动选插图和底色。 */
 export function CategoryIcon({ name, size = 56, active = false }: { name: string; size?: number; active?: boolean }) {
-  const { art, tint } = categoryArt(name);
+  const { art } = categoryArt(name);
   return (
     <span
-      className={`flex items-center justify-center rounded-2xl transition-shadow ${active ? "ring-2 ring-brand ring-offset-2" : ""}`}
-      style={{ width: size, height: size, background: tint }}
+      className={`flex items-center justify-center rounded-[30%] bg-page transition-shadow ${active ? "ring-2 ring-brand ring-offset-2" : ""}`}
+      style={{ width: size, height: size }}
     >
       <Art name={art} className="h-[86%] w-[86%]" />
     </span>

@@ -3,20 +3,21 @@
 @tailwind utilities;
 
 /* 设计变量：调整整体风格只改这里。
-   颜色写成「红 绿 蓝」三个数字，方便叠加透明度；括号里是对应的十六进制色值。 */
+   颜色写成「红 绿 蓝」三个数字，方便叠加透明度；括号里是对应的十六进制色值。
+   风格参照苹果：只有一个强调色（蓝），其余是白、浅灰和黑；不用渐变，几乎不用阴影（#78）。 */
 :root {
-  --c-brand: 31 90 246; /* 主色：明亮的品牌蓝 (#1f5af6) */
-  --c-brand-dark: 21 70 200; /* (#1546c8) */
-  --c-brand-soft: 234 241 255; /* (#eaf1ff) */
-  --c-accent: 255 107 26; /* 强调色：只用于价格和「加入购物车」「提交订货单」等主要操作 (#ff6b1a) */
-  --c-accent-dark: 234 88 12; /* (#ea580c) */
-  --c-ink: 15 27 45; /* 正文 (#0f1b2d) */
-  --c-muted: 91 107 128; /* 次要文字 (#5b6b80) */
-  --c-faint: 148 163 184; /* 提示文字 (#94a3b8) */
-  --c-line: 230 235 242; /* 分隔线 (#e6ebf2) */
-  --c-page: 244 246 250; /* 页面底色 (#f4f6fa) */
-  --c-surface: 255 255 255; /* 卡片底色 (#ffffff) */
-  --r-card: 16px;
+  --c-brand: 0 113 227; /* 唯一的强调色：按钮、链接、选中状态 (#0071e3) */
+  --c-brand-dark: 0 98 196; /* 按下时 (#0062c4) */
+  --c-brand-soft: 232 242 253; /* 选中状态的浅底 (#e8f2fd) */
+  --c-accent: 0 113 227; /* 原橙色强调色已取消，保留变量名，等同主色 */
+  --c-accent-dark: 0 98 196;
+  --c-ink: 29 29 31; /* 正文和价格 (#1d1d1f) */
+  --c-muted: 110 110 115; /* 次要文字 (#6e6e73) */
+  --c-faint: 134 134 139; /* 提示文字 (#86868b) */
+  --c-line: 229 229 234; /* 分隔线 (#e5e5ea) */
+  --c-page: 245 245 247; /* 页面浅灰底、图片底 (#f5f5f7) */
+  --c-surface: 255 255 255; /* 白 (#ffffff) */
+  --r-card: 18px;
   --r-control: 12px;
 
   /* 底部导航高度（不含苹果手机底部横条的安全区）。 */
@@ -97,16 +98,31 @@
     height: 100%;
   }
 
-  .bg-brand-gradient {
-    background-color: rgb(var(--c-brand));
-    background-image: linear-gradient(135deg, #3d7bff 0%, #1f5af6 45%, #1640c4 100%);
-  }
+  /* 旧的渐变类名保留，现在都是纯色（苹果风格不用渐变）。 */
+  .bg-brand-gradient,
   .bg-accent-gradient {
-    background-color: rgb(var(--c-accent));
-    background-image: linear-gradient(135deg, #ff9a3d 0%, #ff6b1a 55%, #f4511e 100%);
+    background-color: rgb(var(--c-brand));
   }
+  .bg-brand-gradient:active,
   .bg-accent-gradient:active {
-    background-image: linear-gradient(135deg, #f08a2e 0%, #ea580c 100%);
+    background-color: rgb(var(--c-brand-dark));
+  }
+
+  /* 半透明磨砂：顶部搜索栏、底部导航。不支持的浏览器（部分旧安卓）退回为接近不透明的白。 */
+  .glass {
+    background-color: rgb(255 255 255 / 0.94);
+  }
+  @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .glass {
+      background-color: rgb(255 255 255 / 0.72);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+    }
+  }
+
+  /* 大标题：苹果式略收紧字距。 */
+  .headline {
+    letter-spacing: -0.02em;
   }
 }
 
@@ -144,7 +160,7 @@
   }
 }
 .skeleton {
-  background: #e6ebf2;
+  background: #ececf0;
   border-radius: 8px;
   animation: shimmer 1.4s ease-in-out infinite;
 }
