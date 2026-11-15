@@ -10,3 +10,8 @@ export function formatYuan(cents: number): string {
 export function brandModel(brand: string, model: string): string {
   return [brand, model].filter((part) => part.trim() !== "").join(" · ");
 }
+
+/** 拨号链接只保留数字和加号：店铺电话可能写成「0512-6812 3456」「(0512) 68123456」。 */
+export function telHref(phone: string): string {
+  return `tel:${phone.replace(/[^0-9+]/g, "")}`;
+}

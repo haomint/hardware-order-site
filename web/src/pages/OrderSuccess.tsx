@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import type { OrderReceipt } from "../api/index.ts";
 import { copyText } from "../lib/clipboard.ts";
-import { formatYuan } from "../lib/format.ts";
+import { formatYuan, telHref } from "../lib/format.ts";
 import { useShop } from "../lib/shop.tsx";
 import { toast } from "../components/Feedback.tsx";
 import { openContact } from "../components/ContactSheet.tsx";
@@ -128,7 +128,7 @@ export function OrderSuccess() {
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         {shop?.phone ? (
-          <a href={`tel:${shop.phone}`} className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-full border border-line bg-surface text-[15px] font-medium text-ink active:bg-page">
+          <a href={telHref(shop.phone)} className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-full border border-line bg-surface text-[15px] font-medium text-ink active:bg-page">
             <PhoneIcon size={18} />
             拨打店铺电话
           </a>

@@ -12,6 +12,7 @@ import type { BannerAction } from "../components/BannerCarousel.tsx";
 import { CategoryIcon } from "../components/Art.tsx";
 import { CartBadge, TabBar } from "../components/TabBar.tsx";
 import { CartIcon, ChevronRightIcon, CloseIcon, PhoneIcon, SearchIcon } from "../components/icons.tsx";
+import { telHref } from "../lib/format.ts";
 
 const PAGE_SIZE = 20;
 /** 分类不超过这个数时平均排满一行，超过时可左右滑动。 */
@@ -128,7 +129,7 @@ export function Home() {
         <h1 className="headline min-w-0 flex-1 truncate text-[30px] font-semibold leading-tight text-ink">{shop?.name ?? " "}</h1>
         {shop?.phone && (
           <a
-            href={`tel:${shop.phone}`}
+            href={telHref(shop.phone)}
             aria-label={`拨打店铺电话 ${shop.phone}`}
             className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink active:bg-page"
           >
@@ -313,7 +314,7 @@ export function Home() {
 
         <footer className="pb-2 pt-1 text-center text-[12px] leading-relaxed text-faint">
           <p>页面价格为参考价，最终金额以商家联系确认为准</p>
-          {shop?.wechatContactText && <p>{shop.wechatContactText}</p>}
+          {shop?.wechatContactText && <p className="whitespace-pre-line break-words">{shop.wechatContactText}</p>}
           <Link to="/privacy" className="mt-1 inline-flex min-h-tap items-center text-[12px] text-muted underline underline-offset-2">
             隐私说明
           </Link>

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShop } from "../lib/shop.tsx";
 import { BackIcon } from "../components/icons.tsx";
+import { telHref } from "../lib/format.ts";
 
 /** 订单信息的保存期限。由店主确认后修改这里，页面其他地方不用动。 */
 const RETENTION = "订单完成或取消后保存 3 年，用于售后和对账，到期后删除";
@@ -88,12 +89,12 @@ export function Privacy() {
                 {shop?.phone && (
                   <li>
                     电话：
-                    <a href={`tel:${shop.phone}`} className="tabular font-medium text-brand">
+                    <a href={telHref(shop.phone)} className="tabular font-medium text-brand">
                       {shop.phone}
                     </a>
                   </li>
                 )}
-                {shop?.wechatContactText && <li>{shop.wechatContactText}</li>}
+                {shop?.wechatContactText && <li className="whitespace-pre-line break-words">{shop.wechatContactText}</li>}
               </ul>
             ) : (
               <p>请到店或通过您已有的联系方式联系店家。</p>
