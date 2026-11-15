@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { notificationRetryTiming, type OrderReceipt } from "../../shared/index.ts";
 import { transaction } from "./db.ts";
 import { ApiFailure, OrderFailure } from "./errors.ts";
+import { createOrderTimeoutReminders, loadOrderTimeoutConfig } from "./order-timeout-reminders.ts";
 import { createWecomSender, loadWecomConfig, WecomFailure } from "./wecom.ts";
 
 const retryDelays = [30_000, 120_000, 600_000];
@@ -41,8 +42,10 @@ function message(job: Job) {
 
 export function createOrderNotifications(
   db: DatabaseSync, config: ReturnType<typeof loadWecomConfig>, now: () => number, request?: typeof fetch,
+  orderTimeout = loadOrderTimeoutConfig({}),
 ) {
   const send = config && createWecomSender(config, now, request);
+  const processTimeoutReminder = send && createOrderTimeoutReminders(db, orderTimeout, now, send);
   const insert = db.prepare(`
     INSERT INTO order_notifications (order_no, status, next_attempt_at, failure_code)
     VALUES (?, ?, ?, ?)
@@ -156,6 +159,11 @@ export function createOrderNotifications(
     });
   }
 
+  async function processNotifications() {
+    await processNext();
+    await processTimeoutReminder?.();
+  }
+
   return {
     expireManual,
     retry(orderNo: string, key: string) {
@@ -176,7 +184,7 @@ export function createOrderNotifications(
     },
     async processDue() {
       expireManual();
-      active ??= processNext().finally(() => { active = undefined; });
+      active ??= processNotifications().finally(() => { active = undefined; });
       return active;
     },
     async drain() {

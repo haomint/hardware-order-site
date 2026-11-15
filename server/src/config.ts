@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { AdminWriteOriginSchema, ShopSchema } from "../../shared/index.ts";
 import { loadWecomConfig } from "./wecom.ts";
+import { loadOrderTimeoutConfig } from "./order-timeout-reminders.ts";
 
 export function databasePath(env = process.env) {
   return resolve(env.DATABASE_PATH || "data/hardware-order.sqlite");
@@ -38,6 +39,7 @@ export function loadConfig(env = process.env) {
     developmentOrigins,
     secureCookie: production || siteOrigin.startsWith("https://"),
     wecom: loadWecomConfig(env),
+    orderTimeout: loadOrderTimeoutConfig(env),
     shop: ShopSchema.parse({
       name: env.SHOP_NAME ?? "威马五金",
       phone: env.SHOP_PHONE ?? "",
