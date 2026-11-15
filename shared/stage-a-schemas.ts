@@ -32,11 +32,16 @@ function listOf<T extends z.ZodType>(item: T) {
 
 export const ShopSchema = z.strictObject({
   name: requiredText("店名", 100).describe("店名，去除首尾空白后为 1 至 100 个字符。"),
-  phone: text("联系电话", 50).describe("店铺公开联系电话，去除首尾空白后最多 50 个字符。可包含区号、加号、空格或连字符。未填写时为空字符串。"),
-  wechatContactText: text("客服微信引导文案", 300).describe("纯文本文案，去除首尾空白后最多 300 个字符。未填写时为空字符串。"),
+  phone: text("联系电话", 50).describe("店铺公开联系电话，去除首尾空白后最多 50 个字符。未填写时为空字符串。"),
+  wechatContactText: text("客服微信引导文案", 300)
+    .describe("纯文本文案，去除首尾空白后最多 300 个字符，保留正文内部的换行。未填写时为空字符串。"),
 }, objectError);
 
-export const ShopPatchSchema = ShopSchema.partial().refine(
+export const ShopPatchSchema = ShopSchema.extend({
+  phone: ShopSchema.shape.phone
+    .regex(/^[0-9+() -]*$/, "联系电话只能填写数字、空格、加号、减号和圆括号。")
+    .describe("去除首尾空白后最多 50 个字符，只允许数字、普通空格、加号、减号和英文圆括号。可传空字符串清空。"),
+}).partial().refine(
   (value) => Object.keys(value).length > 0,
   "请至少填写一项店铺资料。",
 ).meta({ minProperties: 1 });

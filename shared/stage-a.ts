@@ -122,7 +122,13 @@ export const stageA = {
   updateAdminShop: {
     method: "patch", path: "/api/admin/shop", tag: shopTag, admin: true,
     summary: "修改店铺资料",
-    description: "用 application/json 提交至少一个字段。三项都只接受字符串并去除首尾空白。店名必有内容，最多 100 个字符；联系电话最多 50 个字符，可包含区号，不强制匹配大陆手机号格式；客服微信引导文案最多 300 个字符。传空字符串可清空联系电话或引导文案，省略字段保持原值。未知字段、空请求对象及 null 均返回 INVALID_REQUEST，字段校验错误附中文 fieldErrors。所有字段校验后一次保存，成功返回完整资料；保存失败返回 INTERNAL_ERROR。",
+    description: [
+      "用 application/json 提交至少一个字段。三项都只接受字符串并去除首尾空白。店名必有内容，最多 100 个字符。",
+      "联系电话最多 50 个字符，允许区号，只能填数字、普通空格、加号、减号和英文圆括号。此字符限制用于后台提交。",
+      "客服微信引导文案为最多 300 个字符的纯文本，允许换行。保留正文内部的换行，商城按原样分行显示。",
+      "传空字符串可清空联系电话或引导文案，省略字段保持原值。未知字段、空请求对象及 null 均返回 INVALID_REQUEST，字段校验错误附中文 fieldErrors。",
+      "所有字段校验后一次保存，成功返回完整资料。保存失败返回 INTERNAL_ERROR。",
+    ].join(" "),
     body: { schema: ShopPatchSchema },
     success: { status: 200, schema: ShopSchema },
   },
