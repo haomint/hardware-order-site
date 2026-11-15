@@ -4,6 +4,7 @@ import { api } from "../api/index.ts";
 import type { Category, ProductListItem } from "../api/index.ts";
 import { useShop } from "../lib/shop.tsx";
 import { useAsync } from "../lib/useAsync.ts";
+import { useWhitePage } from "../lib/useWhitePage.ts";
 import { ProductRow, ProductRowSkeleton } from "../components/ProductCard.tsx";
 import { EmptyNotice, ErrorNotice, toast } from "../components/Feedback.tsx";
 import { BannerCarousel } from "../components/BannerCarousel.tsx";
@@ -18,6 +19,7 @@ const ROW_FIT = 6;
 
 export function Home() {
   const shop = useShop();
+  useWhitePage();
   const listRef = useRef<HTMLElement>(null);
 
   // 搜索词和分类放在地址里：返回列表时保持原状，转发链接也能带上筛选条件。
@@ -197,7 +199,7 @@ export function Home() {
         {(categoryList.length > 0 || categories.state.status === "loading") && (
           <nav aria-labelledby="category-title">
             <div className="mb-3 flex items-baseline justify-between gap-3">
-              <h2 id="category-title" className="headline text-[22px] font-semibold text-ink">
+              <h2 id="category-title" className="headline text-[24px] font-semibold text-ink">
                 分类
               </h2>
               <Link to="/categories" className="flex min-h-tap shrink-0 items-center text-[15px] text-brand">
@@ -208,7 +210,7 @@ export function Home() {
             <ul className={`flex ${fits ? "-mx-1" : "no-scrollbar -mx-5 gap-1 overflow-x-auto px-4"}`}>
               {categories.state.status === "loading" &&
                 Array.from({ length: 5 }, (_, i) => (
-                  <li key={i} className="flex flex-1 flex-col items-center gap-2" aria-hidden="true">
+                  <li key={i} className="flex max-w-[88px] flex-1 flex-col items-center gap-2" aria-hidden="true">
                     <span className="skeleton h-[60px] w-[60px] rounded-[18px]" />
                     <span className="skeleton h-3 w-10" />
                   </li>
@@ -216,7 +218,7 @@ export function Home() {
               {categoryList.map((category) => {
                 const active = category.id === categoryId;
                 return (
-                  <li key={category.id} className={fits ? "min-w-0 flex-1" : "w-[72px] shrink-0"}>
+                  <li key={category.id} className={fits ? "min-w-0 max-w-[88px] flex-1" : "w-[72px] shrink-0"}>
                     <button
                       type="button"
                       aria-pressed={active}
@@ -241,7 +243,7 @@ export function Home() {
         {/* 商品列表 */}
         <section ref={listRef} aria-labelledby="list-title">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 id="list-title" className="headline min-w-0 truncate text-[22px] font-semibold text-ink">
+            <h2 id="list-title" className="headline min-w-0 truncate text-[24px] font-semibold text-ink">
               {title}
             </h2>
             {filtered && (
@@ -309,7 +311,7 @@ export function Home() {
           )}
         </section>
 
-        <footer className="border-t border-line pb-2 pt-4 text-center text-[12px] leading-relaxed text-faint">
+        <footer className="pb-2 pt-1 text-center text-[12px] leading-relaxed text-faint">
           <p>页面价格为参考价，最终金额以商家联系确认为准</p>
           {shop?.wechatContactText && <p>{shop.wechatContactText}</p>}
           <Link to="/privacy" className="mt-1 inline-flex min-h-tap items-center text-[12px] text-muted underline underline-offset-2">
