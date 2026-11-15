@@ -22,6 +22,7 @@ type ApiResult = {
 };
 
 const apiBase = "https://qyapi.weixin.qq.com/cgi-bin/";
+export const wecomDuplicateWindowSeconds = 1800;
 const invalidTokens = new Set([40014, 42001]);
 const permanentErrors = new Set([40001, 40013, 40056, 60020]);
 
@@ -88,25 +89,29 @@ export function createWecomSender(config: WecomConfig, now: () => number, reques
     return value;
   }
 
-  async function send(content: string, signal: AbortSignal) {
+  async function send(content: string, signal: AbortSignal, beforeDispatch?: () => void) {
     const url = new URL("message/send", apiBase);
     url.searchParams.set("access_token", await accessToken(signal));
+    beforeDispatch?.();
     return call(url, signal, {
       touser: config.userId,
       agentid: config.agentId,
       msgtype: "text",
       text: { content },
       enable_duplicate_check: 1,
-      duplicate_check_interval: 1800,
+      duplicate_check_interval: wecomDuplicateWindowSeconds,
     });
   }
 
-  return async (content: string) => {
-    const signal = AbortSignal.timeout(notificationRetryTiming.channelTimeoutSeconds * 1000);
-    let result = await send(content, signal);
+  return async (
+    content: string,
+    signal = AbortSignal.timeout(notificationRetryTiming.channelTimeoutSeconds * 1000),
+    beforeDispatch?: () => void,
+  ) => {
+    let result = await send(content, signal, beforeDispatch);
     if (invalidTokens.has(errorCode(result) ?? -1)) {
       token = undefined;
-      result = await send(content, signal);
+      result = await send(content, signal, beforeDispatch);
     }
     if (invalidTokens.has(errorCode(result) ?? -1)) token = undefined;
     requireSuccess(result);
