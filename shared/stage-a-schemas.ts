@@ -31,10 +31,15 @@ function listOf<T extends z.ZodType>(item: T) {
 }
 
 export const ShopSchema = z.strictObject({
-  name: requiredText("店名", 100).describe("店名。"),
-  phone: text("联系电话", 50).describe("店铺公开联系电话，可包含区号。未配置时为空字符串。"),
-  wechatContactText: text("客服微信引导文案", 300).describe("客服微信引导文案。未配置时为空字符串。"),
+  name: requiredText("店名", 100).describe("店名，去除首尾空白后为 1 至 100 个字符。"),
+  phone: text("联系电话", 50).describe("店铺公开联系电话，去除首尾空白后最多 50 个字符。可包含区号、加号、空格或连字符。未填写时为空字符串。"),
+  wechatContactText: text("客服微信引导文案", 300).describe("纯文本文案，去除首尾空白后最多 300 个字符。未填写时为空字符串。"),
 }, objectError);
+
+export const ShopPatchSchema = ShopSchema.partial().refine(
+  (value) => Object.keys(value).length > 0,
+  "请至少填写一项店铺资料。",
+).meta({ minProperties: 1 });
 
 const categoryName = requiredText("分类名称", 50).describe("分类名称，去除首尾空白。");
 const sortOrder = z.int("排序值必须是整数。").min(0, "排序值不能小于 0。")
@@ -185,6 +190,7 @@ export const ImageUploadSchema = z.strictObject({
 }, objectError);
 
 export type Shop = z.output<typeof ShopSchema>;
+export type ShopPatch = z.output<typeof ShopPatchSchema>;
 export type Category = z.output<typeof CategorySchema>;
 export type ProductListItem = z.output<typeof ProductListItemSchema>;
 export type ProductDetail = z.output<typeof ProductDetailSchema>;

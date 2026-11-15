@@ -3,7 +3,7 @@
   "info": {
     "title": "五金订货网站 · 阶段 A 接口契约",
     "version": "0.1.0",
-    "description": "覆盖公开店铺资料、商品目录、后台分类与商品管理、管理员会话和图片上传。\n\n商品列表使用 page、pageSize 和 { items, total }。页码超过范围时 items 为空。分类列表一次返回全部匹配分类，格式仍为 { items, total }，其中 total 等于 items.length。\n\n列表查询参数只接受文档列出的单值字段。请求体的未知字段视为参数错误。PATCH 省略的字段保持原值。\n\n商品参考单价用整数分。priceCents 为 null 时显示「价格面议」。品牌和型号未填写时返回空字符串，前台隐藏相应项。新增时可以省略，编辑时传空字符串可清空。已上架商品可以同时缺货。\n\n生产环境同源访问，后台使用 HttpOnly、Secure、SameSite=Lax、Path=/ 的 Cookie。后台写操作校验 Origin。开发环境可通过环境配置加入前端开发服务器的完整来源。跨端口直连时仅对配置的来源开放带凭据的 CORS，前端请求使用 credentials: include。仅本地 HTTP 开发可省略 Cookie 的 Secure 属性。\n\n登录成功后会话有效期为 30 天。每次需登录的后台接口成功返回时，从本次请求起重新计算 30 天有效期，同时续发 Cookie。会话到期或主动退出后需重新登录。会话和后台数据禁止缓存。\n\n公开商品目录应重新验证或禁用缓存，使上下架、缺货和删除变更及时生效。图片以同源根路径公开静态访问，使用不可猜测的随机文件名，可长期缓存。替换图片时使用新路径，源站清理图片后客户端可能仍持有旧缓存。\n\nINVALID_REQUEST 可以附带 fieldErrors。键为字段路径，如 name 或 detailImageIds.0，数组下标从 0 开始。值为简体中文提示。无法定位字段时使用 message。"
+    "description": "覆盖公开及后台店铺资料、商品目录、后台分类与商品管理、管理员会话和图片上传。\n\n商品列表使用 page、pageSize 和 { items, total }。页码超过范围时 items 为空。分类列表一次返回全部匹配分类，格式仍为 { items, total }，其中 total 等于 items.length。\n\n列表查询参数只接受文档列出的单值字段。请求体的未知字段视为参数错误。PATCH 省略的字段保持原值。\n\n商品参考单价用整数分。priceCents 为 null 时显示「价格面议」。品牌和型号未填写时返回空字符串，前台隐藏相应项。新增时可以省略，编辑时传空字符串可清空。已上架商品可以同时缺货。\n\n生产环境同源访问，后台使用 HttpOnly、Secure、SameSite=Lax、Path=/ 的 Cookie。后台写操作校验 Origin。开发环境可通过环境配置加入前端开发服务器的完整来源。跨端口直连时仅对配置的来源开放带凭据的 CORS，前端请求使用 credentials: include。仅本地 HTTP 开发可省略 Cookie 的 Secure 属性。\n\n登录成功后会话有效期为 30 天。每次需登录的后台接口成功返回时，从本次请求起重新计算 30 天有效期，同时续发 Cookie。会话到期或主动退出后需重新登录。会话和后台数据禁止缓存。\n\n公开商品目录应重新验证或禁用缓存，使上下架、缺货和删除变更及时生效。图片以同源根路径公开静态访问，使用不可猜测的随机文件名，可长期缓存。替换图片时使用新路径，源站清理图片后客户端可能仍持有旧缓存。\n\nINVALID_REQUEST 可以附带 fieldErrors。键为字段路径，如 name 或 detailImageIds.0，数组下标从 0 开始。值为简体中文提示。无法定位字段时使用 message。"
   },
   "paths": {
     "/api/shop": {
@@ -13,7 +13,7 @@
           "公开目录"
         ],
         "summary": "查看店铺资料",
-        "description": "返回店名 name、联系电话 phone 和客服微信引导文案 wechatContactText，均来自服务端部署配置。",
+        "description": "返回当前保存的店名 name、联系电话 phone 和客服微信引导文案 wechatContactText，响应结构沿用 ShopSchema。后台保存成功后，下一次请求即读取新资料。响应使用 Cache-Control: no-store。",
         "security": [],
         "responses": {
           "200": {
@@ -27,17 +27,17 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 100,
-                      "description": "店名。"
+                      "description": "店名，去除首尾空白后为 1 至 100 个字符。"
                     },
                     "phone": {
                       "type": "string",
                       "maxLength": 50,
-                      "description": "店铺公开联系电话，可包含区号。未配置时为空字符串。"
+                      "description": "店铺公开联系电话，去除首尾空白后最多 50 个字符。可包含区号、加号、空格或连字符。未填写时为空字符串。"
                     },
                     "wechatContactText": {
                       "type": "string",
                       "maxLength": 300,
-                      "description": "客服微信引导文案。未配置时为空字符串。"
+                      "description": "纯文本文案，去除首尾空白后最多 300 个字符。未填写时为空字符串。"
                     }
                   },
                   "required": [
@@ -78,6 +78,326 @@
                     }
                   }
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/shop": {
+      "get": {
+        "operationId": "getAdminShop",
+        "tags": [
+          "后台店铺资料"
+        ],
+        "summary": "读取当前店铺资料",
+        "description": "与公开接口读取同一份已保存的资料。首次启动且数据库还未保存资料时，用 SHOP_NAME、SHOP_PHONE 和 SHOP_WECHAT_CONTACT_TEXT 初始化并持久化。缺省值依次为「威马五金」、空字符串、空字符串。资料一旦保存，重启或修改环境变量不会覆盖它。成功响应续期，且禁止缓存。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100,
+                      "description": "店名，去除首尾空白后为 1 至 100 个字符。"
+                    },
+                    "phone": {
+                      "type": "string",
+                      "maxLength": 50,
+                      "description": "店铺公开联系电话，去除首尾空白后最多 50 个字符。可包含区号、加号、空格或连字符。未填写时为空字符串。"
+                    },
+                    "wechatContactText": {
+                      "type": "string",
+                      "maxLength": 300,
+                      "description": "纯文本文案，去除首尾空白后最多 300 个字符。未填写时为空字符串。"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "phone",
+                    "wechatContactText"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateAdminShop",
+        "tags": [
+          "后台店铺资料"
+        ],
+        "summary": "修改店铺资料",
+        "description": "用 application/json 提交至少一个字段。三项都只接受字符串并去除首尾空白。店名必有内容，最多 100 个字符；联系电话最多 50 个字符，可包含区号，不强制匹配大陆手机号格式；客服微信引导文案最多 300 个字符。传空字符串可清空联系电话或引导文案，省略字段保持原值。未知字段、空请求对象及 null 均返回 INVALID_REQUEST，字段校验错误附中文 fieldErrors。所有字段校验后一次保存，成功返回完整资料；保存失败返回 INTERNAL_ERROR。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100,
+                      "description": "店名，去除首尾空白后为 1 至 100 个字符。"
+                    },
+                    "phone": {
+                      "type": "string",
+                      "maxLength": 50,
+                      "description": "店铺公开联系电话，去除首尾空白后最多 50 个字符。可包含区号、加号、空格或连字符。未填写时为空字符串。"
+                    },
+                    "wechatContactText": {
+                      "type": "string",
+                      "maxLength": 300,
+                      "description": "纯文本文案，去除首尾空白后最多 300 个字符。未填写时为空字符串。"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "phone",
+                    "wechatContactText"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "店名，去除首尾空白后为 1 至 100 个字符。"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "description": "店铺公开联系电话，去除首尾空白后最多 50 个字符。可包含区号、加号、空格或连字符。未填写时为空字符串。"
+                  },
+                  "wechatContactText": {
+                    "type": "string",
+                    "maxLength": 300,
+                    "description": "纯文本文案，去除首尾空白后最多 300 个字符。未填写时为空字符串。"
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 1
               }
             }
           }

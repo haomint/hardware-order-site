@@ -18,6 +18,7 @@ import {
   ProductPageSchema,
   ProductPatchSchema,
   ProductQuerySchema,
+  ShopPatchSchema,
   ShopSchema,
 } from "./stage-a-schemas.ts";
 
@@ -72,7 +73,7 @@ export const stageAInfo = {
   title: "五金订货网站 · 阶段 A 接口契约",
   version: "0.1.0",
   description: [
-    "覆盖公开店铺资料、商品目录、后台分类与商品管理、管理员会话和图片上传。",
+    "覆盖公开及后台店铺资料、商品目录、后台分类与商品管理、管理员会话和图片上传。",
     "商品列表使用 page、pageSize 和 { items, total }。页码超过范围时 items 为空。分类列表一次返回全部匹配分类，格式仍为 { items, total }，其中 total 等于 items.length。",
     "列表查询参数只接受文档列出的单值字段。请求体的未知字段视为参数错误。PATCH 省略的字段保持原值。",
     "商品参考单价用整数分。priceCents 为 null 时显示「价格面议」。品牌和型号未填写时返回空字符串，前台隐藏相应项。新增时可以省略，编辑时传空字符串可清空。已上架商品可以同时缺货。",
@@ -101,6 +102,7 @@ const categoryTag = "后台分类";
 const productTag = "后台商品";
 const sessionTag = "管理员会话";
 const catalogTag = "公开目录";
+const shopTag = "后台店铺资料";
 const categoryOrder = "按 sortOrder 升序，再按 createdAt 升序排列。排序值和创建时间均相同时按 id 升序稳定排列。";
 const productOrder = "置顶优先，其后按 sortOrder 升序、createdAt 降序排列。前三项均相同时按 id 升序，保证分页稳定。";
 
@@ -108,7 +110,20 @@ export const stageA = {
   getShop: {
     method: "get", path: "/api/shop", tag: catalogTag,
     summary: "查看店铺资料",
-    description: "返回店名 name、联系电话 phone 和客服微信引导文案 wechatContactText，均来自服务端部署配置。",
+    description: "返回当前保存的店名 name、联系电话 phone 和客服微信引导文案 wechatContactText，响应结构沿用 ShopSchema。后台保存成功后，下一次请求即读取新资料。响应使用 Cache-Control: no-store。",
+    success: { status: 200, schema: ShopSchema },
+  },
+  getAdminShop: {
+    method: "get", path: "/api/admin/shop", tag: shopTag, admin: true,
+    summary: "读取当前店铺资料",
+    description: "与公开接口读取同一份已保存的资料。首次启动且数据库还未保存资料时，用 SHOP_NAME、SHOP_PHONE 和 SHOP_WECHAT_CONTACT_TEXT 初始化并持久化。缺省值依次为「威马五金」、空字符串、空字符串。资料一旦保存，重启或修改环境变量不会覆盖它。成功响应续期，且禁止缓存。",
+    success: { status: 200, schema: ShopSchema },
+  },
+  updateAdminShop: {
+    method: "patch", path: "/api/admin/shop", tag: shopTag, admin: true,
+    summary: "修改店铺资料",
+    description: "用 application/json 提交至少一个字段。三项都只接受字符串并去除首尾空白。店名必有内容，最多 100 个字符；联系电话最多 50 个字符，可包含区号，不强制匹配大陆手机号格式；客服微信引导文案最多 300 个字符。传空字符串可清空联系电话或引导文案，省略字段保持原值。未知字段、空请求对象及 null 均返回 INVALID_REQUEST，字段校验错误附中文 fieldErrors。所有字段校验后一次保存，成功返回完整资料；保存失败返回 INTERNAL_ERROR。",
+    body: { schema: ShopPatchSchema },
     success: { status: 200, schema: ShopSchema },
   },
   listCategories: {
