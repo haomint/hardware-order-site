@@ -4,8 +4,9 @@ import { api } from "../api/index.ts";
 import type { Shop } from "../api/index.ts";
 
 const ShopContext = createContext<Shop | null>(null);
+const SetShopContext = createContext<(shop: Shop) => void>(() => {});
 
-/** 店铺资料全站只请求一次。加载失败时各页面按「没有店铺资料」降级显示。 */
+/** 店铺资料全站只请求一次，后台保存后由 useSetShop 更新。加载失败时各页面按「没有店铺资料」降级显示。 */
 export function ShopProvider({ children }: { children: ReactNode }) {
   const [shop, setShop] = useState<Shop | null>(null);
 
@@ -24,9 +25,18 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return <ShopContext.Provider value={shop}>{children}</ShopContext.Provider>;
+  return (
+    <SetShopContext.Provider value={setShop}>
+      <ShopContext.Provider value={shop}>{children}</ShopContext.Provider>
+    </SetShopContext.Provider>
+  );
 }
 
 export function useShop(): Shop | null {
   return useContext(ShopContext);
+}
+
+/** 后台保存店铺资料后，用返回的资料更新全站显示，切回商城不用刷新。 */
+export function useSetShop(): (shop: Shop) => void {
+  return useContext(SetShopContext);
 }

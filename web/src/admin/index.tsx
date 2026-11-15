@@ -6,6 +6,7 @@ import { Login } from "./Login.tsx";
 import { Products } from "./Products.tsx";
 import { ProductEdit } from "./ProductEdit.tsx";
 import { Categories } from "./Categories.tsx";
+import { ShopSettings } from "./ShopSettings.tsx";
 import { Orders } from "./Orders.tsx";
 import { OrderEdit } from "./OrderEdit.tsx";
 
@@ -25,6 +26,7 @@ export default function AdminApp() {
         <Route path="products/new" element={<ProductEdit />} />
         <Route path="products/:id" element={<ProductEdit />} />
         <Route path="categories" element={<Categories />} />
+        <Route path="shop" element={<ShopSettings />} />
         <Route path="orders" element={<Orders />} />
         <Route path="orders/:orderNo" element={<OrderEdit />} />
         <Route path="*" element={<Navigate to="products" replace />} />

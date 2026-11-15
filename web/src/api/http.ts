@@ -22,6 +22,7 @@ import type {
   ProductListItem,
   ProductQuery,
   Shop,
+  ShopPatch,
   UpdateProduct,
 } from "./types.ts";
 
@@ -86,6 +87,17 @@ const id = (value: string) => encodeURIComponent(value);
 
 export function getShop(): Promise<Shop> {
   return request("/api/shop");
+}
+
+// ── 后台店铺资料 ──────────────────────────────────────
+
+export function getAdminShop(): Promise<Shop> {
+  return request("/api/admin/shop");
+}
+
+/** 只提交改动的项，返回保存后的完整资料。 */
+export function updateAdminShop(patch: ShopPatch): Promise<Shop> {
+  return request("/api/admin/shop", json("PATCH", patch));
 }
 
 export function listCategories(): Promise<ListResult<Category>> {

@@ -3,6 +3,7 @@ import { useShop } from "../lib/shop.tsx";
 import { copyText } from "../lib/clipboard.ts";
 import { toast } from "./Feedback.tsx";
 import { ChatIcon, CloseIcon, CopyIcon, PhoneIcon } from "./icons.tsx";
+import { telHref } from "../lib/format.ts";
 
 // 「联系店铺」面板：任何页面调用 openContact() 打开，全站只挂载一个 <ContactSheet />。
 let open = false;
@@ -66,7 +67,7 @@ export function ContactSheet() {
         {/* 内容太长时在弹窗里滚动，标题和关闭按钮始终在屏幕内 */}
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 pb-6">
           {phone && (
-            <a href={`tel:${phone}`} className="flex items-center gap-3 rounded-card bg-page p-4 active:bg-brand-soft">
+            <a href={telHref(phone)} className="flex items-center gap-3 rounded-card bg-page p-4 active:bg-brand-soft">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-white shadow-brand">
                 <PhoneIcon size={20} />
               </span>
@@ -84,7 +85,7 @@ export function ContactSheet() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-semibold text-ink">微信联系</span>
-                <span className="block break-words text-sm text-muted">{wechat}</span>
+                <span className="block whitespace-pre-line break-words text-sm text-muted">{wechat}</span>
               </span>
               <button
                 type="button"

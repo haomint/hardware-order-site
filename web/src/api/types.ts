@@ -2,6 +2,7 @@
 // 仅引入类型，构建时会被完全擦除，不会把 zod 打进前端包。
 export type {
   Shop,
+  ShopPatch,
   Category,
   ProductListItem,
   ProductDetail,

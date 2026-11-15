@@ -37,6 +37,7 @@ import type {
   ProductListItem,
   ProductQuery,
   Shop,
+  ShopPatch,
   UpdateProduct,
 } from "./types.ts";
 
@@ -77,7 +78,7 @@ const cat = {
   empty: "6f1c1b7e-0b0a-4a52-9d0e-1a2b3c4d5e06",
 };
 
-const shop: Shop = {
+let shop: Shop = {
   name: "示例五金店",
   phone: "13800000000",
   wechatContactText: "添加店主微信：shili-wujin",
@@ -352,6 +353,39 @@ function paginate<T>(rows: T[], query: ProductQuery): T[] {
 
 export function getShop(): Promise<Shop> {
   return delay(shop, 120);
+}
+
+export function getAdminShop(): Promise<Shop> {
+  return admin(() => shop);
+}
+
+/** 按契约校验：店名必填 ≤100；电话 ≤50，只能是数字、空格、+ - ()；微信文案 ≤300，保留中间换行。 */
+export function updateAdminShop(patch: ShopPatch): Promise<Shop> {
+  return admin(() => {
+    if (Object.keys(patch).length === 0) fail(400, "INVALID_REQUEST", "请至少填写一项店铺资料。");
+    const next = { ...shop };
+    const errors: Record<string, string> = {};
+    if (patch.name !== undefined) {
+      const name = patch.name.trim();
+      if (!name) errors.name = "请填写店名。";
+      else if (name.length > 100) errors.name = "店名不能超过 100 个字。";
+      next.name = name;
+    }
+    if (patch.phone !== undefined) {
+      const phone = patch.phone.trim();
+      if (phone.length > 50) errors.phone = "联系电话不能超过 50 个字。";
+      else if (!/^[0-9+() -]*$/.test(phone)) errors.phone = "联系电话只能填写数字、空格、加号、减号和圆括号。";
+      next.phone = phone;
+    }
+    if (patch.wechatContactText !== undefined) {
+      const text = patch.wechatContactText.trim();
+      if (text.length > 300) errors.wechatContactText = "客服微信引导文案不能超过 300 个字。";
+      next.wechatContactText = text;
+    }
+    if (Object.keys(errors).length > 0) fail(400, "INVALID_REQUEST", "请检查填写的内容后重试。", errors);
+    shop = next;
+    return shop;
+  }, 300);
 }
 
 export function listCategories(): Promise<ListResult<Category>> {
