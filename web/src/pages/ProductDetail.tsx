@@ -102,9 +102,10 @@ function DetailBody({ product }: { product: Product }) {
         {facts.length > 0 && (
           <dl className="mt-3 flex flex-wrap gap-2">
             {facts.map((fact) => (
-              <div key={fact.label} className="flex items-center gap-1.5 rounded-lg bg-page px-2.5 py-1.5 text-[13px]">
-                <dt className="text-muted">{fact.label}</dt>
-                <dd className="font-medium text-ink">{fact.value}</dd>
+              <div key={fact.label} className="flex min-w-0 max-w-full items-baseline gap-1.5 rounded-lg bg-page px-2.5 py-1.5 text-[13px]">
+                <dt className="shrink-0 text-muted">{fact.label}</dt>
+                {/* 很长且没有空格的型号也要能换行，不被卡片截掉 */}
+                <dd className="min-w-0 break-all font-medium text-ink">{fact.value}</dd>
               </div>
             ))}
           </dl>

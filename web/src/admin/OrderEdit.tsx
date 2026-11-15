@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/index.ts";
@@ -86,7 +86,11 @@ function Editor({
     document.title = `订单 ${order.orderNo} - 店铺后台`;
   }, [order.orderNo]);
 
+  // 一次只保存一项：上一项保存完之前，其他保存按钮都不可点，避免先发出的结果晚到、盖掉新的显示。
+  const busy = useRef(false);
   const save = async (key: string, patch: UpdateOrder, done: string) => {
+    if (busy.current) return false;
+    busy.current = true;
     setSaving(key);
     try {
       const updated = await api.updateAdminOrder(order.orderNo, patch);
@@ -97,6 +101,7 @@ function Editor({
       toast(messageOf(error));
       return false;
     } finally {
+      busy.current = false;
       setSaving(null);
     }
   };
@@ -175,7 +180,7 @@ function Editor({
               type="button"
               role="radio"
               aria-checked={order.status === status}
-              disabled={saving === "status"}
+              disabled={saving !== null}
               onClick={() => pickStatus(status)}
               className={`min-h-tap rounded-control border-2 text-[15px] font-semibold disabled:opacity-60 ${
                 order.status === status ? "border-brand bg-brand-soft text-brand" : "border-line text-ink active:bg-page"
@@ -199,7 +204,7 @@ function Editor({
                 <div className="flex gap-2">
                   <Button
                     className="flex-1"
-                    disabled={saving === "reason" || !reason.trim()}
+                    disabled={saving !== null || !reason.trim()}
                     onClick={async () => {
                       if (await save("reason", { cancellationReason: reason.trim() }, "已更新取消原因")) setEditingReason(false);
                     }}
@@ -247,7 +252,7 @@ function Editor({
               type="button"
               role="radio"
               aria-checked={order.paymentStatus === value}
-              disabled={saving === "payment"}
+              disabled={saving !== null}
               onClick={() => value !== order.paymentStatus && save("payment", { paymentStatus: value }, `已改为「${PAYMENT[value]}」`)}
               className={`min-h-[48px] rounded-control border-2 text-[16px] font-semibold disabled:opacity-60 ${
                 order.paymentStatus === value
@@ -280,7 +285,7 @@ function Editor({
               maxLength={13}
               className="min-w-0 flex-1"
             />
-            <Button className="shrink-0" disabled={saving === "final" || finalText === centsText(order.finalTotalCents)} onClick={() => saveFinal()}>
+            <Button className="shrink-0" disabled={saving !== null || finalText === centsText(order.finalTotalCents)} onClick={() => saveFinal()}>
               保存
             </Button>
           </div>
@@ -293,7 +298,7 @@ function Editor({
             </p>
           )}
           {order.finalTotalCents !== null && (
-            <button type="button" onClick={() => saveFinal(true)} disabled={saving === "final"} className="mt-1 min-h-tap text-[14px] text-muted underline underline-offset-2">
+            <button type="button" onClick={() => saveFinal(true)} disabled={saving !== null} className="mt-1 min-h-tap text-[14px] text-muted underline underline-offset-2">
               清除确认金额
             </button>
           )}
@@ -377,7 +382,7 @@ function Editor({
         />
         <div className="mt-2 flex items-center justify-between gap-3">
           <span className="text-[12px] text-faint">{order.adminNoteUpdatedAt ? `更新于 ${formatTime(order.adminNoteUpdatedAt)}` : ""}</span>
-          <Button disabled={saving === "note" || note.trim() === order.adminNote} onClick={() => save("note", { adminNote: note.trim() }, "内部备注已保存")}>
+          <Button disabled={saving !== null || note.trim() === order.adminNote} onClick={() => save("note", { adminNote: note.trim() }, "内部备注已保存")}>
             保存备注
           </Button>
         </div>

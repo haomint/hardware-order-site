@@ -25,12 +25,16 @@ export function Home() {
   const q = params.get("q") ?? "";
   const categoryId = params.get("c") ?? "";
 
+  // 延迟搜索触发时筛选条件可能已经变了（例如刚点了「查看全部商品」）：始终以最新的地址为准。
+  const latest = useRef(params);
+  latest.current = params;
   const setFilter = (next: { q?: string; c?: string }) => {
-    const merged = { q, c: categoryId, ...next };
+    const current = latest.current;
+    const merged = { q: current.get("q") ?? "", c: current.get("c") ?? "", ...next };
     const search = new URLSearchParams();
     if (merged.q.trim()) search.set("q", merged.q.trim());
     if (merged.c) search.set("c", merged.c);
-    setParams(search, { replace: true });
+    if (search.toString() !== current.toString()) setParams(search, { replace: true });
   };
 
   // 输入时先更新输入框，停顿片刻后再搜索；点「搜索」立即搜索。
@@ -38,7 +42,9 @@ export function Home() {
   useEffect(() => setDraft(q), [q]);
   useEffect(() => {
     if (draft.trim() === q) return;
-    const timer = window.setTimeout(() => setFilter({ q: draft }), 400);
+    const timer = window.setTimeout(() => {
+      if (draft.trim() !== (latest.current.get("q") ?? "")) setFilter({ q: draft });
+    }, 400);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft]);
@@ -50,6 +56,18 @@ export function Home() {
     window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: "smooth" });
   };
 
+  // 搜索或切换分类会收起横幅、列表位置随之上移：等筛选后的页面渲染好再量位置滚动。
+  const pendingScroll = useRef(false);
+  const scrollAfterFilter = (willChange: boolean) => {
+    if (willChange) pendingScroll.current = true;
+    else scrollToList();
+  };
+  useEffect(() => {
+    if (!pendingScroll.current) return;
+    pendingScroll.current = false;
+    window.requestAnimationFrame(scrollToList);
+  }, [q, categoryId]);
+
   const categories = useAsync(() => api.listCategories(), []);
   const categoryList: Category[] = categories.state.status === "ready" ? categories.state.data.items : [];
   const categoryName = (id: string) => categoryList.find((c) => c.id === id)?.name;
@@ -57,8 +75,12 @@ export function Home() {
 
   const [extra, setExtra] = useState<ProductListItem[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
+  // 换筛选、搜索或刷新时换一代；还在路上的「加载更多」属于旧一代，回来后直接丢弃。
+  const generation = useRef(0);
   const first = useAsync(() => {
+    generation.current += 1;
     setExtra([]);
+    setLoadingMore(false);
     return api.listProducts({ q, categoryId, page: "1", pageSize: String(PAGE_SIZE) });
   }, [q, categoryId]);
 
@@ -70,28 +92,34 @@ export function Home() {
   const shown = first.state.status === "ready" ? items : (stale?.items ?? []);
 
   const loadMore = async () => {
+    const mine = generation.current;
     setLoadingMore(true);
     try {
       const page = Math.floor(items.length / PAGE_SIZE) + 1;
       const next = await api.listProducts({ q, categoryId, page: String(page), pageSize: String(PAGE_SIZE) });
+      if (mine !== generation.current) return;
       setExtra((previous) => [...previous, ...next.items]);
     } catch (error) {
-      toast(error instanceof Error ? error.message : "加载失败，请重试。");
+      if (mine === generation.current) toast(error instanceof Error ? error.message : "加载失败，请重试。");
     } finally {
-      setLoadingMore(false);
+      if (mine === generation.current) setLoadingMore(false);
     }
   };
 
   const onBanner = (action: BannerAction) => {
     if (action.kind === "category") {
       const match = categoryList.find((c) => action.match.test(c.name));
-      if (match) setFilter({ c: match.id, q: "" });
-      else {
+      if (match) {
+        scrollAfterFilter(match.id !== categoryId || q !== "");
+        setFilter({ c: match.id, q: "" });
+      } else {
+        scrollAfterFilter(action.keyword !== q || categoryId !== "");
         setDraft(action.keyword);
         setFilter({ q: action.keyword, c: "" });
       }
+      return;
     }
-    window.setTimeout(scrollToList, 60);
+    scrollToList();
   };
 
   const filtered = q !== "" || categoryId !== "";
@@ -139,9 +167,9 @@ export function Home() {
           role="search"
           onSubmit={(event) => {
             event.preventDefault();
+            scrollAfterFilter(draft.trim() !== q);
             setFilter({ q: draft });
             (document.activeElement as HTMLElement | null)?.blur();
-            scrollToList();
           }}
           className="flex h-[52px] items-center rounded-full border-2 border-brand bg-surface pl-4 pr-1 focus-within:shadow-brand"
         >
@@ -205,8 +233,8 @@ export function Home() {
                       type="button"
                       aria-pressed={active}
                       onClick={() => {
+                        if (!active) scrollAfterFilter(true);
                         setFilter({ c: active ? "" : category.id });
-                        if (!active) window.setTimeout(scrollToList, 60);
                       }}
                       className="flex w-full flex-col items-center gap-1.5 active:opacity-70"
                     >
@@ -252,7 +280,7 @@ export function Home() {
           {first.state.status === "error" ? (
             <ErrorNotice message={first.state.error.message} onRetry={first.retry} />
           ) : refreshing && stale === undefined ? (
-            <div className="grid grid-cols-1 gap-3 min-[440px]:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 min-[640px]:grid-cols-2">
               {Array.from({ length: 4 }, (_, index) => (
                 <ProductRowSkeleton key={index} />
               ))}
@@ -277,8 +305,8 @@ export function Home() {
             </EmptyNotice>
           ) : (
             <>
-              {/* 手机上每行一张卡片，屏幕宽于 440px 时每行两张 */}
-              <div className={`grid grid-cols-1 gap-3 transition-opacity min-[440px]:grid-cols-2 ${refreshing ? "opacity-50" : ""}`}>
+              {/* 手机上每行一张卡片，屏幕不窄于 640px 时每行两张 */}
+              <div className={`grid grid-cols-1 gap-3 transition-opacity min-[640px]:grid-cols-2 ${refreshing ? "opacity-50" : ""}`}>
                 {shown.map((product) => (
                   <ProductRow key={product.id} product={product} categoryName={categoryName(product.categoryId)} />
                 ))}
