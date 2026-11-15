@@ -21,7 +21,7 @@ export function CartBadge({ className = "" }: { className?: string }) {
   if (count === 0) return null;
   return (
     <span
-      className={`tabular absolute flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold leading-none text-white ring-2 ring-white ${pop ? "animate-pop" : ""} ${className}`}
+      className={`tabular absolute flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#ff3b30] px-1 text-[11px] font-semibold leading-none text-white ring-2 ring-white ${pop ? "animate-pop" : ""} ${className}`}
     >
       {count > 99 ? "99+" : count}
     </span>
@@ -35,14 +35,13 @@ export function TabBar() {
 
   const item = (active: boolean) =>
     `relative flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${
-      active ? "text-brand" : "text-muted"
+      active ? "text-brand" : "text-faint"
     }`;
 
   return (
     <nav
       aria-label="主导航"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface/95 shadow-bar"
-      style={{ backdropFilter: "saturate(180%) blur(12px)", WebkitBackdropFilter: "saturate(180%) blur(12px)" }}
+      className="glass fixed inset-x-0 bottom-0 z-40 shadow-bar"
     >
       <div className="pb-safe mx-auto max-w-shell">
         <div className="flex" style={{ height: "var(--tabbar-h)" }}>

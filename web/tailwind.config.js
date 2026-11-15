@@ -27,11 +27,12 @@ export default {
         control: "var(--r-control)",
       },
       boxShadow: {
-        card: "0 2px 10px rgba(17, 38, 80, 0.05), 0 1px 2px rgba(17, 38, 80, 0.04)",
-        float: "0 8px 24px rgba(17, 38, 80, 0.10)",
-        bar: "0 -4px 16px rgba(17, 38, 80, 0.06)",
-        accent: "0 4px 12px rgba(255, 107, 26, 0.32)",
-        brand: "0 8px 20px rgba(31, 90, 246, 0.28)",
+        // 苹果风格几乎不用阴影：卡片靠白底和浅灰页面区分，浮层只留很淡的投影。
+        card: "0 1px 2px rgba(0, 0, 0, 0.04)",
+        float: "0 8px 30px rgba(0, 0, 0, 0.08)",
+        bar: "0 -0.5px 0 rgba(0, 0, 0, 0.12)",
+        accent: "none",
+        brand: "none",
       },
       minHeight: { tap: "44px" },
       minWidth: { tap: "44px" },
