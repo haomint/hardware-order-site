@@ -37,17 +37,9 @@ export function Home() {
     if (search.toString() !== current.toString()) setParams(search, { replace: true });
   };
 
-  // 输入时先更新输入框，停顿片刻后再搜索；点「搜索」立即搜索。
+  // 输入时只改输入框，不搜索；点「搜索」或键盘上的搜索键才搜（店主要求，#64）。点 × 清空则立即回到全部商品。
   const [draft, setDraft] = useState(q);
   useEffect(() => setDraft(q), [q]);
-  useEffect(() => {
-    if (draft.trim() === q) return;
-    const timer = window.setTimeout(() => {
-      if (draft.trim() !== (latest.current.get("q") ?? "")) setFilter({ q: draft });
-    }, 400);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft]);
 
   const scrollToList = () => {
     const el = listRef.current;
