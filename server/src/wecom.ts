@@ -28,10 +28,12 @@ const permanentErrors = new Set([40001, 40013, 40056, 60020]);
 
 export class WecomFailure extends Error {
   readonly retryable: boolean;
+  readonly deliveryUncertain: boolean;
 
-  constructor(code: string, retryable = true) {
+  constructor(code: string, retryable = true, deliveryUncertain = false) {
     super(code);
     this.retryable = retryable;
+    this.deliveryUncertain = deliveryUncertain;
   }
 }
 
@@ -39,10 +41,10 @@ function errorCode(result: ApiResult) {
   return typeof result.errcode === "number" && Number.isSafeInteger(result.errcode) ? result.errcode : undefined;
 }
 
-function requireSuccess(result: ApiResult) {
+function requireSuccess(result: ApiResult, sending = false) {
   const code = errorCode(result);
   if (code === 0) return;
-  if (code === undefined) throw new WecomFailure("WECOM_INVALID_RESPONSE");
+  if (code === undefined) throw new WecomFailure("WECOM_INVALID_RESPONSE", true, sending);
   throw new WecomFailure(`WECOM_${code}`, !permanentErrors.has(code));
 }
 
@@ -58,17 +60,17 @@ export function createWecomSender(config: WecomConfig, now: () => number, reques
       });
       if (!response.ok) {
         await response.body?.cancel();
-        throw new WecomFailure(`WECOM_HTTP_${response.status}`);
+        throw new WecomFailure(`WECOM_HTTP_${response.status}`, true, !!body && response.status >= 500);
       }
       const value: unknown = await response.json();
       if (value === null || typeof value !== "object" || Array.isArray(value)) {
-        throw new WecomFailure("WECOM_INVALID_RESPONSE");
+        throw new WecomFailure("WECOM_INVALID_RESPONSE", true, !!body);
       }
       return value;
     } catch (error) {
       if (error instanceof WecomFailure) throw error;
       // fetch 的错误可能带请求 URL，不能写入数据库或日志。
-      throw new WecomFailure(signal.aborted ? "WECOM_TIMEOUT" : "WECOM_REQUEST_FAILED");
+      throw new WecomFailure(signal.aborted ? "WECOM_TIMEOUT" : "WECOM_REQUEST_FAILED", true, !!body);
     }
   }
 
@@ -92,6 +94,7 @@ export function createWecomSender(config: WecomConfig, now: () => number, reques
   async function send(content: string, signal: AbortSignal, beforeDispatch?: () => void) {
     const url = new URL("message/send", apiBase);
     url.searchParams.set("access_token", await accessToken(signal));
+    if (signal.aborted) throw new WecomFailure("WECOM_TIMEOUT");
     beforeDispatch?.();
     return call(url, signal, {
       touser: config.userId,
@@ -114,7 +117,7 @@ export function createWecomSender(config: WecomConfig, now: () => number, reques
       result = await send(content, signal, beforeDispatch);
     }
     if (invalidTokens.has(errorCode(result) ?? -1)) token = undefined;
-    requireSuccess(result);
+    requireSuccess(result, true);
     if (result.invaliduser || result.unlicenseduser) throw new WecomFailure("WECOM_INVALID_RECIPIENT", false);
   };
 }

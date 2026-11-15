@@ -7,6 +7,12 @@ const dayMinutes = 24 * 60;
 const recoveryWindow = (wecomDuplicateWindowSeconds - 60) * 1000;
 const retryAfter = 30_000;
 
+type PendingReminder = {
+  order_no: string;
+  first_dispatch_at: number | null;
+  failure_code: string | null;
+};
+
 function timeOfDay(value: string, name: string) {
   if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new Error(`${name} 必须使用 HH:mm 格式。`);
   const [hour, minutes] = value.split(":").map(Number);
@@ -39,7 +45,7 @@ export function createOrderTimeoutReminders(
   }
 
   const pending = db.prepare(`
-    SELECT o.order_no
+    SELECT o.order_no, r.first_dispatch_at, r.failure_code
     FROM orders o LEFT JOIN order_timeout_reminders r USING (order_no)
     WHERE o.status = 'pending_contact' AND coalesce(o.status_updated_at, o.created_at) <= ?
       AND (r.order_no IS NULL OR r.next_attempt_at <= ?)
@@ -51,6 +57,11 @@ export function createOrderTimeoutReminders(
   `);
   const finish = db.prepare(`
     UPDATE order_timeout_reminders SET finished_at = ?, next_attempt_at = NULL, failure_code = ?
+    WHERE order_no = ?
+  `);
+  const recordRetry = db.prepare(`
+    UPDATE order_timeout_reminders
+    SET first_dispatch_at = CASE WHEN ? THEN first_dispatch_at ELSE ? END, failure_code = ?
     WHERE order_no = ?
   `);
   const expire = db.prepare(`
@@ -69,15 +80,16 @@ export function createOrderTimeoutReminders(
 
   // 失败后保留同一条消息用于恢复，企业微信按相同内容去重。
   return async function processTimeoutReminder() {
-    const orderNo = transaction(db, () => {
+    const job = transaction(db, () => {
       const startedAt = now();
       expire.run(startedAt, startedAt - recoveryWindow);
       if (isQuiet(startedAt)) return undefined;
-      const row = pending.get(startedAt - config.delay, startedAt) as { order_no: string } | undefined;
+      const row = pending.get(startedAt - config.delay, startedAt) as PendingReminder | undefined;
       if (row) reserve.run(row.order_no, startedAt + retryAfter);
-      return row?.order_no;
+      return row;
     });
-    if (!orderNo) return;
+    if (!job) return;
+    const orderNo = job.order_no;
 
     let deferred = false;
     try {
@@ -93,9 +105,14 @@ export function createOrderTimeoutReminders(
       });
       finish.run(now(), null, orderNo);
     } catch (error) {
-      if (deferred) return;
       const failure = error instanceof WecomFailure ? error : new WecomFailure("WECOM_INTERNAL_ERROR", false);
-      if (!failure.retryable) finish.run(now(), failure.message, orderNo);
+      if (deferred || failure.retryable) {
+        // 明确拒绝只撤销本轮的发送标记，保留上一次可能已送达的记录。
+        recordRetry.run(Number(failure.deliveryUncertain), job.first_dispatch_at,
+          deferred ? job.failure_code : failure.message, orderNo);
+      } else {
+        finish.run(now(), failure.message, orderNo);
+      }
     }
   };
 }

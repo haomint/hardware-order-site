@@ -277,11 +277,61 @@ test("重建处理器后按相同内容恢复未确认发送，自定义时段�
   await f.notifications.processDue();
   assert.equal(timeoutCalls, 1);
   assert.equal(f.db.prepare("SELECT finished_at FROM order_timeout_reminders").get()?.finished_at, null);
+  assert.equal(f.db.prepare("SELECT failure_code FROM order_timeout_reminders").get()?.failure_code,
+    "WECOM_REQUEST_FAILED");
   f.advance(30_000);
   const restarted = f.build().notifications;
   await restarted.processDue();
   await restarted.processDue();
   assert.equal(timeoutCalls, 2);
   assert.equal(deliveries.size, 1);
+  assert.ok(f.db.prepare("SELECT finished_at FROM order_timeout_reminders").get()?.finished_at);
+});
+
+test("取令牌暂时失败会记录错误，恢复后仍可发送超时提醒", async (t) => {
+  let tokenFails = false;
+  let timeoutCalls = 0;
+  const f = fixture(t, async (input, options) => {
+    if (String(input).includes("/gettoken")) {
+      return tokenFails ? Response.json({ errcode: -1, errmsg: "test-secret" }) : tokenResponse();
+    }
+    if (notificationContent(options).startsWith("【待联系超时】")) timeoutCalls++;
+    return Response.json({ errcode: 0 });
+  });
+  assert.equal((await f.submit()).status, 201);
+  await f.notifications.processDue();
+  f.advance(7_200_000);
+  tokenFails = true;
+  await f.build().notifications.processDue();
+  assert.equal(timeoutCalls, 0);
+  assert.deepEqual({ ...f.db.prepare(`
+    SELECT first_dispatch_at, finished_at, failure_code FROM order_timeout_reminders
+  `).get() }, { first_dispatch_at: null, finished_at: null, failure_code: "WECOM_-1" });
+  tokenFails = false;
+  f.advance(30_000);
+  await f.build().notifications.processDue();
+  assert.equal(timeoutCalls, 1);
+  assert.equal(f.db.prepare("SELECT failure_code FROM order_timeout_reminders").get()?.failure_code, null);
+});
+
+test("20:59 明确拒绝的提醒会在次日 08:00 再次发送", async (t) => {
+  let timeoutCalls = 0;
+  const f = fixture(t, async (input, options) => {
+    if (String(input).includes("/gettoken")) return tokenResponse();
+    const isTimeout = notificationContent(options).startsWith("【待联系超时】");
+    return Response.json({ errcode: isTimeout && ++timeoutCalls === 1 ? -1 : 0 });
+  });
+  assert.equal((await f.submit()).status, 201);
+  await f.notifications.processDue();
+  f.advance((8 * 60 - 1) * 60_000); // 20:59
+  await f.notifications.processDue();
+  assert.equal(timeoutCalls, 1);
+  assert.equal(f.db.prepare("SELECT first_dispatch_at FROM order_timeout_reminders").get()?.first_dispatch_at, null);
+  f.advance(60_000); // 21:00
+  await f.notifications.processDue();
+  assert.equal(timeoutCalls, 1);
+  f.advance(11 * 3_600_000); // 次日 08:00
+  await f.build().notifications.processDue();
+  assert.equal(timeoutCalls, 2);
   assert.ok(f.db.prepare("SELECT finished_at FROM order_timeout_reminders").get()?.finished_at);
 });
