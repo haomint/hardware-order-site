@@ -46,10 +46,10 @@ export function ContactSheet() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="contact-title"
-        className="animate-sheet pb-safe w-full max-w-shell rounded-t-[22px] bg-surface"
+        className="animate-sheet pb-safe flex max-h-[85vh] w-full max-w-shell flex-col rounded-t-[22px] bg-surface"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 pb-2 pt-4">
+        <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-4">
           <h2 id="contact-title" className="text-lg font-bold text-ink">
             联系{shop?.name ?? "店铺"}
           </h2>
@@ -63,7 +63,8 @@ export function ContactSheet() {
           </button>
         </div>
 
-        <div className="space-y-3 px-5 pb-6">
+        {/* 内容太长时在弹窗里滚动，标题和关闭按钮始终在屏幕内 */}
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 pb-6">
           {phone && (
             <a href={`tel:${phone}`} className="flex items-center gap-3 rounded-card bg-page p-4 active:bg-brand-soft">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-white shadow-brand">

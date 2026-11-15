@@ -101,11 +101,17 @@ export function removeFromCart(productId: string): { line: CartLine; index: numb
 }
 
 /** 撤销移除：放回原来的位置。 */
-export function restoreToCart(line: CartLine, index: number) {
-  if (memory.some((item) => item.productId === line.productId)) return;
+/**
+ * 撤销移除。购物车里已有这件商品时不重复加入；购物车已满时不恢复，
+ * 以免挤掉别的商品（例如移除后另一个页面又加满了）。
+ */
+export function restoreToCart(line: CartLine, index: number): "restored" | "exists" | "full" {
+  if (memory.some((item) => item.productId === line.productId)) return "exists";
+  if (memory.length >= MAX_LINES) return "full";
   const next = [...memory];
   next.splice(Math.min(index, next.length), 0, line);
-  write(next.slice(0, MAX_LINES));
+  write(next);
+  return "restored";
 }
 
 /** 用最新查询到的名称、单位和图片更新备份。 */
@@ -125,6 +131,20 @@ export function refreshSnapshots(products: CartProduct[]) {
 
 export function clearCart() {
   write([]);
+}
+
+/**
+ * 下单成功后只去掉已经订了的数量。提交期间在别的页面新加的商品、加多的数量都保留，
+ * 以免没订上的东西被一起清掉。
+ */
+export function removeOrdered(items: { productId: string; quantity: number }[]) {
+  const ordered = new Map(items.map((item) => [item.productId.toLowerCase(), item.quantity]));
+  const next: CartLine[] = [];
+  for (const line of memory) {
+    const rest = line.quantity - (ordered.get(line.productId.toLowerCase()) ?? 0);
+    if (rest > 0) next.push({ ...line, quantity: rest });
+  }
+  write(next);
 }
 
 function subscribe(listener: () => void) {

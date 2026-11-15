@@ -4,7 +4,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { OrderDetailSchema, OrderPageSchema, OrderReceiptSchema, StageBApiErrorSchema, orderCsvColumns } from "../../shared/index.ts";
+import {
+  OrderDetailWithNotificationSchema, OrderPageWithNotificationSchema, OrderReceiptSchema, StageBApiErrorSchema, orderCsvColumns,
+} from "../../shared/index.ts";
 import { setAdministrator } from "../src/auth.ts";
 import { loadConfig } from "../src/config.ts";
 import { openDatabase } from "../src/db.ts";
@@ -77,7 +79,7 @@ async function error(response: Response, status: number, code: string) {
 
 async function detail(response: Response) {
   assert.equal(response.status, 200);
-  return OrderDetailSchema.parse(await response.json());
+  return OrderDetailWithNotificationSchema.parse(await response.json());
 }
 
 test("后台订单要求登录，修改校验 Origin，订单不存在时返回 404", async (t) => {
@@ -112,7 +114,7 @@ test("列表按时间和订单号倒序，按状态、收款、日期及关键�
   const list = async (search = "") => {
     const response = await admin(collection + search);
     assert.equal(response.status, 200);
-    return OrderPageSchema.parse(await response.json());
+    return OrderPageWithNotificationSchema.parse(await response.json());
   };
   const all = await list();
   assert.deepEqual(all.items.map(({ orderNo }) => orderNo), [third.orderNo, second.orderNo, first.orderNo]);
@@ -148,7 +150,7 @@ test("订单可跨步、回退和恢复，收款和其他字段独立记录修�
   assert.equal(completed.paymentStatusUpdatedAt, initial.paymentStatusUpdatedAt);
   assert.notEqual(completed.statusUpdatedAt, initial.statusUpdatedAt);
   const filtered = await admin(`${collection}?paymentStatus=unpaid&status=completed`);
-  assert.equal(OrderPageSchema.parse(await filtered.json()).items[0].orderNo, order.orderNo);
+  assert.equal(OrderPageWithNotificationSchema.parse(await filtered.json()).items[0].orderNo, order.orderNo);
 
   advance();
   const paid = await detail(await admin(path, { paymentStatus: "paid", finalTotalCents: 0, adminNote: "已自提" }));

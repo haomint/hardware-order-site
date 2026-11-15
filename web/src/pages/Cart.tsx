@@ -4,6 +4,7 @@ import { api } from "../api/index.ts";
 import type { CartLookupResult } from "../api/index.ts";
 import {
   changeQuantity,
+  MAX_LINES,
   MAX_QUANTITY,
   refreshSnapshots,
   removeFromCart,
@@ -14,7 +15,7 @@ import {
 import type { CartLine } from "../lib/cart.ts";
 import { brandModel, formatYuan } from "../lib/format.ts";
 import { useShop } from "../lib/shop.tsx";
-import { ErrorNotice } from "../components/Feedback.tsx";
+import { ErrorNotice, toast } from "../components/Feedback.tsx";
 import { TabBar } from "../components/TabBar.tsx";
 import { CartIcon, CloseIcon, MinusIcon, PlusIcon } from "../components/icons.tsx";
 
@@ -82,6 +83,12 @@ export function Cart() {
   }, [missingKey, error, load]);
 
   useEffect(() => () => window.clearTimeout(undoTimer.current), []);
+
+  // 查询失败的商品如果已被移除（包括在别的页面移除），错误提示也随之作废，否则「去下单」会一直点不了。
+  const unresolved = missing.length;
+  useEffect(() => {
+    if (unresolved === 0 && error) setError("");
+  }, [unresolved, error]);
 
   const remove = (productId: string) => {
     const removed = removeFromCart(productId);
@@ -178,7 +185,7 @@ export function Cart() {
             <button
               type="button"
               onClick={() => {
-                restoreToCart(undo.line, undo.index);
+                if (restoreToCart(undo.line, undo.index) === "full") toast(`购物车已满 ${MAX_LINES} 种，无法撤销`);
                 setUndo(null);
                 window.clearTimeout(undoTimer.current);
               }}
