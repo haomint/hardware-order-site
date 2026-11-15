@@ -13,16 +13,22 @@ type Errors = Partial<Record<Key, string>>;
 
 const LIMIT: Record<Key, number> = { name: 100, phone: 50, wechatContactText: 300 };
 
-/** 与契约一致的检查，提交前就近提示；以后端结果为准。 */
-function check(values: Shop): Errors {
+/**
+ * 与契约一致的检查，提交前就近提示；以后端结果为准。
+ * 只检查这次要提交的项：原有资料里的电话即使含有现在不允许的字符，只改店名也能保存。
+ */
+function check(values: Shop, keys: Key[]): Errors {
   const errors: Errors = {};
+  const only = (key: Key) => keys.includes(key);
   const name = values.name.trim();
-  if (!name) errors.name = "请填写店名。";
-  else if (name.length > LIMIT.name) errors.name = `店名不能超过 ${LIMIT.name} 个字。`;
+  if (only("name") && !name) errors.name = "请填写店名。";
+  else if (only("name") && name.length > LIMIT.name) errors.name = `店名不能超过 ${LIMIT.name} 个字。`;
   const phone = values.phone.trim();
-  if (phone.length > LIMIT.phone) errors.phone = `联系电话不能超过 ${LIMIT.phone} 个字。`;
+  if (!only("phone")) {
+    // 电话这次没改，不检查
+  } else if (phone.length > LIMIT.phone) errors.phone = `联系电话不能超过 ${LIMIT.phone} 个字。`;
   else if (!/^[0-9+() -]*$/.test(phone)) errors.phone = "联系电话只能填写数字、空格、加号、减号和圆括号。";
-  if (values.wechatContactText.trim().length > LIMIT.wechatContactText) {
+  if (only("wechatContactText") && values.wechatContactText.trim().length > LIMIT.wechatContactText) {
     errors.wechatContactText = `微信引导文字不能超过 ${LIMIT.wechatContactText} 个字。`;
   }
   return errors;
@@ -61,7 +67,7 @@ function ShopForm({ initial }: { initial: Shop }) {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!changed || saving) return;
-    const found = check(values);
+    const found = check(values, Object.keys(patch) as Key[]);
     setErrors(found);
     if (Object.values(found).some(Boolean)) return;
     setSaving(true);
@@ -92,7 +98,8 @@ function ShopForm({ initial }: { initial: Shop }) {
       </div>
 
       <Card>
-        <div className="space-y-4">
+        {/* 保存期间不能继续编辑，免得保存结果回来时把后改的内容盖掉 */}
+        <fieldset disabled={saving} className="m-0 min-w-0 space-y-4 border-0 p-0">
           <Field label="店名" error={errors.name}>
             {(id, describedBy) => (
               <TextInput
@@ -152,7 +159,7 @@ function ShopForm({ initial }: { initial: Shop }) {
               />
             )}
           </Field>
-        </div>
+        </fieldset>
       </Card>
 
       <Button type="submit" className="w-full" disabled={!changed || saving}>
