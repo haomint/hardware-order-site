@@ -248,6 +248,12 @@ function IconAction({ label, icon, to, onClick }: { label: string; icon: ReactNo
   );
 }
 
+/**
+ * 商品图片区的高度：约占屏幕高度的五分之二，不超过屏幕宽度（不会比正方形更高），
+ * 横屏等很矮的屏幕上至少 220px。图片按原比例完整显示，不裁剪（店主要求，#72）。
+ */
+const MEDIA_HEIGHT = "h-[42vh] max-h-[min(100vw,640px)] min-h-[220px]";
+
 /** 图片轮播：左右滑动切换，底部显示当前第几张。 */
 function Gallery({ images, dimmed }: { images: string[]; dimmed: boolean }) {
   const track = useRef<HTMLDivElement>(null);
@@ -267,16 +273,14 @@ function Gallery({ images, dimmed }: { images: string[]; dimmed: boolean }) {
         aria-label="商品图片，可左右滑动"
       >
         {images.map((src, i) => (
-          <div key={src + i} className="w-full shrink-0 snap-center">
-            <div className="ratio-square">
-              <img
-                src={src}
-                alt={`商品图片 ${i + 1}`}
-                loading={i === 0 ? "eager" : "lazy"}
-                decoding="async"
-                className={`object-contain ${dimmed ? "opacity-55 grayscale" : ""}`}
-              />
-            </div>
+          <div key={src + i} className={`w-full shrink-0 snap-center ${MEDIA_HEIGHT}`}>
+            <img
+              src={src}
+              alt={`商品图片 ${i + 1}`}
+              loading={i === 0 ? "eager" : "lazy"}
+              decoding="async"
+              className={`h-full w-full object-contain px-4 pb-6 pt-2 ${dimmed ? "opacity-55 grayscale" : ""}`}
+            />
           </div>
         ))}
       </div>
@@ -302,9 +306,7 @@ function BottomBar({ children }: { children: ReactNode }) {
 function DetailSkeleton() {
   return (
     <div aria-hidden="true">
-      <div className="ratio-square">
-        <div className="ratio-fill skeleton rounded-none" />
-      </div>
+      <div className={`skeleton rounded-none ${MEDIA_HEIGHT}`} />
       <div className="relative -mt-5 space-y-3 rounded-t-[22px] bg-surface px-4 py-5">
         <div className="skeleton h-8 w-2/5" />
         <div className="skeleton h-4 w-3/5" />
