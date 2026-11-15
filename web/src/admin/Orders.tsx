@@ -65,8 +65,12 @@ export function Orders() {
   const [extra, setExtra] = useState<Summary[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  // 换筛选、搜索或刷新时换一代；还在路上的「加载更多」属于旧一代，回来后直接丢弃。
+  const generation = useRef(0);
   const first = useAsync(() => {
+    generation.current += 1;
     setExtra([]);
+    setLoadingMore(false);
     return api.listAdminOrders({ ...apiQuery, page: "1", pageSize: String(PAGE_SIZE) });
   }, [q, filter, unpaidOnly, refreshKey]);
 
@@ -74,15 +78,17 @@ export function Orders() {
   const total = first.state.status === "ready" ? first.state.data.total : 0;
 
   const loadMore = async () => {
+    const mine = generation.current;
     setLoadingMore(true);
     try {
       const page = Math.floor(items.length / PAGE_SIZE) + 1;
       const next = await api.listAdminOrders({ ...apiQuery, page: String(page), pageSize: String(PAGE_SIZE) });
+      if (mine !== generation.current) return;
       setExtra((previous) => [...previous, ...next.items]);
     } catch (error) {
-      toast(error instanceof Error ? error.message : "加载失败，请重试。");
+      if (mine === generation.current) toast(error instanceof Error ? error.message : "加载失败，请重试。");
     } finally {
-      setLoadingMore(false);
+      if (mine === generation.current) setLoadingMore(false);
     }
   };
 

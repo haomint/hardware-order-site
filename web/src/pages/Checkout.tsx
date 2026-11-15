@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, ApiError } from "../api/index.ts";
 import type { CartLookupResult, CreateOrder } from "../api/index.ts";
-import { clearCart, refreshSnapshots, useCart } from "../lib/cart.ts";
+import { refreshSnapshots, removeOrdered, useCart } from "../lib/cart.ts";
 import { loadContact, saveContact, uuidv4 } from "../lib/contact.ts";
 import { brandModel, formatYuan } from "../lib/format.ts";
 import { useShop } from "../lib/shop.tsx";
@@ -170,7 +170,7 @@ export function Checkout() {
       setKey(null);
       const summary = { receipt, deliveryMethod: delivery, address: input.address ?? null, note: input.note };
       sessionSet(LAST_ORDER_STORAGE, JSON.stringify(summary));
-      clearCart();
+      removeOrdered(input.items);
       navigate("/order/success", { replace: true, state: summary });
     } catch (caught) {
       setSubmitting(false);
