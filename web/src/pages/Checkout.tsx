@@ -5,7 +5,7 @@ import { api, ApiError } from "../api/index.ts";
 import type { CartLookupResult, CreateOrder } from "../api/index.ts";
 import { clearCart, refreshSnapshots, useCart } from "../lib/cart.ts";
 import { loadContact, saveContact, uuidv4 } from "../lib/contact.ts";
-import { formatYuan } from "../lib/format.ts";
+import { brandModel, formatYuan } from "../lib/format.ts";
 import { useShop } from "../lib/shop.tsx";
 import { ErrorNotice, toast } from "../components/Feedback.tsx";
 import { BackIcon, TruckIcon } from "../components/icons.tsx";
@@ -36,12 +36,23 @@ function sessionSet(key: string, value: string | null) {
   }
 }
 
+/** 同时放在内存里：浏览器不能临时存数据时（部分无痕模式），本页内的重试仍沿用同一个键。 */
+let memoryKey: string | null = null;
+
 function currentKey() {
-  const existing = sessionGet(KEY_STORAGE);
-  if (existing) return existing;
-  const key = uuidv4();
+  const existing = sessionGet(KEY_STORAGE) ?? memoryKey;
+  if (existing) {
+    memoryKey = existing;
+    return existing;
+  }
+  return setKey(uuidv4());
+}
+
+/** 更换或清除防重复提交键（null 表示清除），内存和会话存储一起改。 */
+function setKey(key: string | null) {
+  memoryKey = key;
   sessionSet(KEY_STORAGE, key);
-  return key;
+  return key as string;
 }
 
 function check(values: { contactName: string; phone: string; delivery: Delivery; address: string; note: string }): Errors {
@@ -156,7 +167,7 @@ export function Checkout() {
       const receipt = await api.createOrder(input, currentKey());
       submitted.current = true;
       saveContact({ contactName: input.contactName, phone: input.phone, deliveryMethod: delivery, address: address.trim() || saved?.address || "" });
-      sessionSet(KEY_STORAGE, null);
+      setKey(null);
       const summary = { receipt, deliveryMethod: delivery, address: input.address ?? null, note: input.note };
       sessionSet(LAST_ORDER_STORAGE, JSON.stringify(summary));
       clearCart();
@@ -182,7 +193,7 @@ export function Checkout() {
           break;
         case "IDEMPOTENCY_KEY_CONFLICT":
           // 上一次提交可能已经成功（例如网络中断时），但内容被改过。换一个新键，并请客户确认。
-          sessionSet(KEY_STORAGE, uuidv4());
+          setKey(uuidv4());
           setBanner("刚才的订货单可能已经提交成功。如不确定，请先联系店铺确认；确认要按现在的内容提交，请再点一次「提交订货单」。");
           break;
         case "NETWORK_ERROR":
@@ -226,6 +237,7 @@ export function Checkout() {
                 const item = byId.get(line.productId);
                 const product = item && "product" in item ? item.product : undefined;
                 const subtotal = product && product.priceCents !== null ? product.priceCents * line.quantity : null;
+                const sub = product ? brandModel(product.brand, product.model) : "";
                 return (
                   <li key={line.productId} className="flex items-center gap-3 py-2.5">
                     {product && (
@@ -233,6 +245,7 @@ export function Checkout() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-2 text-[15px] leading-snug text-ink">{product?.name ?? line.name}</p>
+                      {sub && <p className="break-words text-[13px] leading-snug text-muted">{sub}</p>}
                       <p className="text-[13px] text-muted">
                         ×{line.quantity} {product?.unit ?? line.unit}
                       </p>
