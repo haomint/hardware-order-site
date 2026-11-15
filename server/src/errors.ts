@@ -1,11 +1,13 @@
-import { apiErrors, StageBApiErrorSchema, stageBErrors } from "../../shared/index.ts";
+import { apiErrors, StageBApiErrorSchema, stageBErrors, stageCErrors } from "../../shared/index.ts";
+
+export const requestErrors = { ...apiErrors, NOTIFICATION_NOT_RETRYABLE: stageCErrors.NOTIFICATION_NOT_RETRYABLE };
 
 export class ApiFailure extends Error {
-  readonly code: keyof typeof apiErrors;
+  readonly code: keyof typeof requestErrors;
   readonly fieldErrors?: Record<string, string>;
 
-  constructor(code: keyof typeof apiErrors, fieldErrors?: Record<string, string>) {
-    super(apiErrors[code].message);
+  constructor(code: keyof typeof requestErrors, fieldErrors?: Record<string, string>) {
+    super(requestErrors[code].message);
     this.code = code;
     this.fieldErrors = fieldErrors;
   }

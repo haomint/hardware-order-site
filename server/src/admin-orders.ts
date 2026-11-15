@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import {
-  AdminOrderQuerySchema, OrderDetailSchema, type OrderDetail, type OrderExportQuery, type OrderPage, type UpdateOrder,
+  AdminOrderQuerySchema, OrderDetailSchema, type OrderDetail, type OrderExportQuery, type OrderPage,
+  type NotificationStatus, type OrderDetailWithNotification, type OrderPageWithNotification, type UpdateOrder,
 } from "../../shared/index.ts";
 import { transaction } from "./db.ts";
 import { OrderFailure } from "./errors.ts";
@@ -27,6 +28,10 @@ type OrderRow = {
   admin_note_updated_at: number | null;
   final_total_updated_at: number | null;
   cancellation_reason_updated_at: number | null;
+};
+type OrderRowWithNotification = OrderRow & {
+  notification_status: NotificationStatus | null;
+  notification_last_attempt_at: number | null;
 };
 
 const iso = (timestamp: number) => new Date(timestamp).toISOString();
@@ -67,10 +72,22 @@ function orderDetail(row: OrderRow) {
   });
 }
 
+function orderDetailWithNotification(row: OrderRowWithNotification): OrderDetailWithNotification {
+  return {
+    ...orderDetail(row),
+    notificationStatus: row.notification_status,
+    notificationLastAttemptAt: optionalIso(row.notification_last_attempt_at),
+  };
+}
+
 export function createAdminOrders(db: DatabaseSync, now: () => number) {
-  const byNumber = db.prepare("SELECT * FROM orders WHERE order_no = ?");
+  const withNotification = `
+    SELECT orders.*, n.status AS notification_status, n.last_attempt_at AS notification_last_attempt_at
+    FROM orders LEFT JOIN order_notifications n USING (order_no)
+  `;
+  const byNumber = db.prepare(`${withNotification} WHERE order_no = ?`);
   const filter = `
-    WHERE (:status IS NULL OR status = :status)
+    WHERE (:status IS NULL OR orders.status = :status)
       AND (:paymentStatus IS NULL OR payment_status = :paymentStatus)
       AND (:from IS NULL OR created_at >= :from)
       AND (:to IS NULL OR created_at < :to)
@@ -78,7 +95,7 @@ export function createAdminOrders(db: DatabaseSync, now: () => number) {
   `;
   const count = db.prepare(`SELECT count(*) AS total FROM orders ${filter}`);
   const page = db.prepare(`
-    SELECT * FROM orders ${filter}
+    ${withNotification} ${filter}
     ${orderBy} LIMIT :limit OFFSET :offset
   `);
   const update = db.prepare(`
@@ -92,7 +109,7 @@ export function createAdminOrders(db: DatabaseSync, now: () => number) {
   `);
 
   function requireOrder(orderNo: string) {
-    const row = byNumber.get(orderNo) as OrderRow | undefined;
+    const row = byNumber.get(orderNo) as OrderRowWithNotification | undefined;
     if (!row) throw new OrderFailure("ORDER_NOT_FOUND");
     return row;
   }
@@ -114,7 +131,7 @@ export function createAdminOrders(db: DatabaseSync, now: () => number) {
         if (reader !== db) reader.close();
       }
     },
-    list(query: Query): OrderPage {
+    list(query: Query): OrderPageWithNotification {
       const filters = {
         status: query.status ?? null,
         paymentStatus: query.paymentStatus ?? null,
@@ -125,13 +142,19 @@ export function createAdminOrders(db: DatabaseSync, now: () => number) {
       const limit = Number(query.pageSize);
       const offset = (Number(query.page) - 1) * limit;
       const total = Number(count.get(filters)?.total);
-      const rows = page.all({ ...filters, limit, offset }) as OrderRow[];
-      return { total, items: rows.map((row) => orderSummary(row, JSON.parse(row.items_json))) };
+      const rows = page.all({ ...filters, limit, offset }) as OrderRowWithNotification[];
+      return {
+        total,
+        items: rows.map((row) => ({
+          ...orderSummary(row, JSON.parse(row.items_json)),
+          notificationStatus: row.notification_status,
+        })),
+      };
     },
-    get(orderNo: string): OrderDetail {
-      return orderDetail(requireOrder(orderNo));
+    get(orderNo: string): OrderDetailWithNotification {
+      return orderDetailWithNotification(requireOrder(orderNo));
     },
-    update(orderNo: string, patch: UpdateOrder): OrderDetail {
+    update(orderNo: string, patch: UpdateOrder): OrderDetailWithNotification {
       return transaction(db, () => {
         const row = requireOrder(orderNo);
         const status = patch.status ?? row.status;
@@ -148,7 +171,7 @@ export function createAdminOrders(db: DatabaseSync, now: () => number) {
         const reasonChanged = cancellationReason !== row.cancellation_reason;
         const totalChanged = finalTotalCents !== row.final_total_cents;
         if (!(statusChanged || paymentChanged || noteChanged || reasonChanged || totalChanged)) {
-          return orderDetail(row);
+          return orderDetailWithNotification(row);
         }
 
         const updatedAt = now();
@@ -160,7 +183,7 @@ export function createAdminOrders(db: DatabaseSync, now: () => number) {
           cancellationReasonUpdatedAt: reasonChanged ? updatedAt : row.cancellation_reason_updated_at,
           finalTotalUpdatedAt: totalChanged ? updatedAt : row.final_total_updated_at,
         });
-        return orderDetail(requireOrder(orderNo));
+        return orderDetailWithNotification(requireOrder(orderNo));
       });
     },
   };

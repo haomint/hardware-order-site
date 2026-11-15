@@ -101,8 +101,7 @@ export function createWecomSender(config: WecomConfig, now: () => number, reques
     });
   }
 
-  return async (content: string) => {
-    const signal = AbortSignal.timeout(notificationRetryTiming.channelTimeoutSeconds * 1000);
+  return async (content: string, signal = AbortSignal.timeout(notificationRetryTiming.channelTimeoutSeconds * 1000)) => {
     let result = await send(content, signal);
     if (invalidTokens.has(errorCode(result) ?? -1)) {
       token = undefined;
