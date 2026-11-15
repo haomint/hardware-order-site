@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Art } from "./Art.tsx";
-import { BadgeCheckIcon, ChevronRightIcon, PhoneIcon, TruckIcon } from "./icons.tsx";
+import { ChevronRightIcon } from "./icons.tsx";
 
 /** 点击横幅后要做的事：滚动到商品列表，或进入某个分类（找不到分类时按关键词搜索）。 */
 export type BannerAction = { kind: "list" } | { kind: "category"; match: RegExp; keyword: string };
@@ -335,25 +335,5 @@ function SlideView({ slide, onAction, focusable }: { slide: Slide; onAction: (a:
         </button>
       </div>
     </div>
-  );
-}
-
-/** 横幅下方的服务说明，一直可见。 */
-export function ServiceStrip() {
-  const points = [
-    { icon: BadgeCheckIcon, text: "免注册下单" },
-    { icon: PhoneIcon, text: "店家确认价格" },
-    { icon: TruckIcon, text: "送货或自提" },
-  ];
-  return (
-    <ul className="flex items-center justify-between rounded-2xl bg-surface px-3 py-2.5 shadow-card" aria-label="服务说明">
-      {points.map(({ icon: Icon, text }, index) => (
-        <li key={text} className="flex min-w-0 items-center gap-1 text-[13px] font-medium text-ink">
-          {index > 0 && <span className="mr-2 h-3.5 w-px bg-line" aria-hidden="true" />}
-          <Icon size={16} className="shrink-0 text-brand" />
-          <span className="whitespace-nowrap">{text}</span>
-        </li>
-      ))}
-    </ul>
   );
 }

@@ -6,7 +6,7 @@ import { useShop } from "../lib/shop.tsx";
 import { useAsync } from "../lib/useAsync.ts";
 import { ProductRow, ProductRowSkeleton } from "../components/ProductCard.tsx";
 import { EmptyNotice, ErrorNotice, toast } from "../components/Feedback.tsx";
-import { BannerCarousel, ServiceStrip } from "../components/BannerCarousel.tsx";
+import { BannerCarousel } from "../components/BannerCarousel.tsx";
 import type { BannerAction } from "../components/BannerCarousel.tsx";
 import { CategoryIcon } from "../components/Art.tsx";
 import { CartBadge, TabBar } from "../components/TabBar.tsx";
@@ -131,7 +131,6 @@ export function Home() {
           </span>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-[21px] font-black leading-tight text-[#13306f]">{shop?.name ?? " "}</h1>
-            <p className="truncate text-[12px] text-muted">线上选货 · 店家确认</p>
           </div>
           {shop?.phone && (
             <a
@@ -199,12 +198,7 @@ export function Home() {
       </div>
 
       <div className="space-y-3 px-4">
-        {!filtered && (
-          <>
-            <BannerCarousel onAction={onBanner} />
-            <ServiceStrip />
-          </>
-        )}
+        {!filtered && <BannerCarousel onAction={onBanner} />}
 
         {/* 分类：不超过 6 个时排满一行，更多时左右滑动 */}
         {(categoryList.length > 0 || categories.state.status === "loading") && (
