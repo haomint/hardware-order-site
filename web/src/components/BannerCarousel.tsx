@@ -15,10 +15,8 @@ type Slide = {
   /** 词组之间的连接符，默认「 · 」。 */
   subJoin?: string;
   cta: string;
-  /** 背景墙面的色调，每张略有不同。 */
-  wall: string;
   action: BannerAction;
-  /** 摆在工作台上的插图，坐标相对右侧 176×140 的区域，底边就是台面。 */
+  /** 右侧的商品插图，坐标相对右侧 176×140 的区域，底边是地面。 */
   art: ReactNode;
   /**
    * 以后换成店主自己的横幅照片时填这里（放在 web/public/banners/ 下），
@@ -39,7 +37,6 @@ const slides: Slide[] = [
     highlight: "一站购齐",
     sub: ["工地工厂", "维修安装", "日常家用"],
     cta: "立即选购",
-    wall: "linear-gradient(180deg, #eef4fc 0%, #d4e1f2 100%)",
     action: { kind: "list" },
     art: (
       <>
@@ -56,7 +53,6 @@ const slides: Slide[] = [
     highlight: "专区",
     sub: ["电钻", "角磨机", "电批"],
     cta: "去看看",
-    wall: "linear-gradient(180deg, #f5f0e8 0%, #e3d7c7 100%)",
     action: { kind: "category", match: /电动|电钻|电锤/, keyword: "电" },
     art: (
       <>
@@ -71,7 +67,6 @@ const slides: Slide[] = [
     highlight: "专区",
     sub: ["自攻螺丝", "膨胀螺栓", "螺母"],
     cta: "去看看",
-    wall: "linear-gradient(180deg, #f0f3f7 0%, #d7dee7 100%)",
     action: { kind: "category", match: /紧固|螺丝|螺栓|螺母/, keyword: "螺" },
     art: (
       <>
@@ -86,7 +81,6 @@ const slides: Slide[] = [
     highlight: "家装常用",
     sub: ["管件", "插座", "胶带", "灯泡"],
     cta: "去看看",
-    wall: "linear-gradient(180deg, #edf3f2 0%, #d2dfdc 100%)",
     action: { kind: "category", match: /水暖|管件|电工|电料/, keyword: "管" },
     art: (
       <>
@@ -104,16 +98,15 @@ const slides: Slide[] = [
     sub: ["选好就下单，", "店家电话确认"],
     subJoin: "",
     cta: "开始选货",
-    wall: "linear-gradient(180deg, #f0f1f8 0%, #d9dcea 100%)",
     action: { kind: "list" },
     art: (
       <ol className="absolute bottom-[14px] right-[6px] w-[136px] space-y-1.5">
         {["选好商品", "提交订货单", "店家联系确认"].map((step, i) => (
           <li
             key={step}
-            className="flex items-center gap-1.5 rounded-full bg-white/90 py-1 pl-1 pr-2.5 text-[12px] font-semibold text-ink shadow-[0_2px_6px_rgba(15,27,45,0.12)]"
+            className="flex items-center gap-1.5 rounded-full bg-white py-1 pl-1 pr-2.5 text-[12px] font-medium text-ink"
           >
-            <span className="bg-brand-gradient flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand text-[11px] font-semibold text-white">
               {i + 1}
             </span>
             {step}
@@ -202,7 +195,7 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
         onMouseDown={hold}
         onMouseUp={release}
         onMouseLeave={() => held && release()}
-        className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-[20px] shadow-card"
+        className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-[22px]"
       >
         {rendered.map((slide, i) => (
           <div
@@ -217,9 +210,9 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
         ))}
       </div>
 
-      {/* 指示点：在木纹台面上，当前页为长条 */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-1.5 flex justify-center">
-        <div className="pointer-events-auto flex items-center rounded-full bg-black/10 px-1">
+      {/* 指示点：卡片下方的灰色小点，当前页颜色更深 */}
+      <div className="mt-1.5 flex justify-center">
+        <div className="flex items-center">
           {slides.map((slide, i) => (
             <button
               key={slide.key}
@@ -227,9 +220,9 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
               aria-label={`第 ${i + 1} 张`}
               aria-current={i === index ? "true" : undefined}
               onClick={() => goTo(i)}
-              className="flex h-5 items-center px-[3px]"
+              className="flex h-6 items-center px-[4px]"
             >
-              <span className={`block h-[5px] rounded-full transition-all duration-300 ${i === index ? "w-4 bg-white" : "w-[5px] bg-white/55"}`} />
+              <span className={`block h-[7px] w-[7px] rounded-full transition-colors duration-300 ${i === index ? "bg-ink/70" : "bg-ink/20"}`} />
             </button>
           ))}
         </div>
@@ -238,75 +231,29 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
   );
 }
 
-/** 背景里虚化的仓库货架，营造实景感。 */
-const shelves = (
-  <svg viewBox="0 0 240 130" className="h-full w-full" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">
-    <g fill="#7b8aa0">
-      <rect x="20" y="0" width="6" height="130" />
-      <rect x="120" y="0" width="6" height="130" />
-      <rect x="220" y="0" width="6" height="130" />
-      <rect x="10" y="38" width="230" height="5" />
-      <rect x="10" y="82" width="230" height="5" />
-    </g>
-    <g>
-      <rect x="32" y="12" width="34" height="26" fill="#c7a679" />
-      <rect x="70" y="20" width="24" height="18" fill="#9fb0c7" />
-      <rect x="98" y="8" width="18" height="30" fill="#b6c2d3" />
-      <rect x="132" y="16" width="40" height="22" fill="#c9ab80" />
-      <rect x="176" y="10" width="38" height="28" fill="#a9b8cc" />
-      <rect x="30" y="56" width="44" height="26" fill="#b1bfd1" />
-      <rect x="78" y="62" width="36" height="20" fill="#c4a274" />
-      <rect x="130" y="52" width="26" height="30" fill="#9fb0c7" />
-      <rect x="160" y="60" width="52" height="22" fill="#c9ab80" />
-      <rect x="34" y="100" width="58" height="30" fill="#a9b8cc" />
-      <rect x="134" y="96" width="44" height="34" fill="#c4a274" />
-    </g>
-  </svg>
-);
-
 function SlideView({ slide, onAction, focusable }: { slide: Slide; onAction: (a: BannerAction) => void; focusable: boolean }) {
   if (slide.image) {
     return (
-      <button type="button" tabIndex={focusable ? 0 : -1} onClick={() => onAction(slide.action)} className="block h-[176px] w-full">
+      <button type="button" tabIndex={focusable ? 0 : -1} onClick={() => onAction(slide.action)} className="block h-[188px] w-full">
         <img src={slide.image} alt={`${slide.title}${slide.highlight}`} className="h-full w-full object-cover" />
       </button>
     );
   }
 
   return (
-    // 整张横幅都可点；真正可聚焦的是按钮。
-    <div className="relative h-[176px] cursor-pointer overflow-hidden" style={{ background: slide.wall }} onClick={() => onAction(slide.action)}>
-      {/* 墙面：虚化货架 + 窗光 */}
-      <div className="pointer-events-none absolute bottom-[30px] right-0 top-0 w-[72%] opacity-40" style={{ filter: "blur(2.5px)" }} aria-hidden="true">
-        {shelves}
-      </div>
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "linear-gradient(105deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.55) 38%, rgba(255,255,255,0) 62%)" }}
-        aria-hidden="true"
-      />
-      {/* 木纹工作台 */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[34px]"
-        style={{
-          background:
-            "repeating-linear-gradient(92deg, rgba(110,62,24,0.10) 0 2px, rgba(0,0,0,0) 2px 11px, rgba(110,62,24,0.06) 11px 12px, rgba(0,0,0,0) 12px 23px), linear-gradient(180deg, #e2c197 0%, #cfa271 35%, #b07a45 100%)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.55), 0 -6px 12px rgba(60,40,20,0.10)",
-        }}
-        aria-hidden="true"
-      />
-
-      <div className="pointer-events-none absolute bottom-[22px] right-1 h-[140px] w-[176px]" aria-hidden="true">
+    // 整张横幅都可点；真正可聚焦的是按钮。苹果风格：浅灰底、大字标题、蓝色文字链接，不用渐变和阴影。
+    <div className="relative h-[188px] cursor-pointer overflow-hidden bg-page" onClick={() => onAction(slide.action)}>
+      <div className="pointer-events-none absolute bottom-[14px] right-2 h-[140px] w-[176px]" aria-hidden="true">
         {slide.art}
       </div>
 
-      <div className="relative flex h-full flex-col justify-center pb-[34px] pl-5 pr-[184px] pt-1">
-        <h2 className="text-[25px] font-black italic leading-[1.15] tracking-wide text-[#13306f]">
+      <div className="relative flex h-full flex-col justify-center pl-6 pr-[176px]">
+        <h2 className="headline text-[24px] font-semibold leading-[1.2] text-ink">
           {slide.title}
           <br />
-          <span className="bg-gradient-to-r from-[#ff8a1f] to-[#f4511e] bg-clip-text pr-1 text-transparent">{slide.highlight}</span>
+          <span className="text-muted">{slide.highlight}</span>
         </h2>
-        <p className="mt-1 text-[12px] font-medium leading-snug text-[#3b4a66]">
+        <p className="mt-1.5 text-[13px] leading-snug text-muted">
           {slide.sub.map((part, i) => (
             // 连接符放在词组外面，后面跟一个可换行点（wbr）。
             <Fragment key={part}>
@@ -327,11 +274,11 @@ function SlideView({ slide, onAction, focusable }: { slide: Slide; onAction: (a:
             event.stopPropagation();
             onAction(slide.action);
           }}
-          // 看到的按钮高 34px，点击区域向外扩到 44px。
-          className="bg-accent-gradient relative mt-2 inline-flex h-[34px] w-fit items-center gap-0.5 rounded-full pl-4 pr-3 text-[14px] font-bold text-white shadow-accent after:absolute after:-inset-[5px] after:content-[''] active:scale-95"
+          // 文字链接样式，点击区域扩到 44px 高。
+          className="relative mt-2.5 inline-flex w-fit items-center gap-0.5 text-[15px] font-medium text-brand after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] active:opacity-60"
         >
           {slide.cta}
-          <ChevronRightIcon size={15} strokeWidth={2.6} />
+          <ChevronRightIcon size={15} strokeWidth={2.2} />
         </button>
       </div>
     </div>
