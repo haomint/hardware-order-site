@@ -3,7 +3,7 @@
 
 版本 `0.1.0` · [OpenAPI 完整定义](./stage-a.openapi.json)
 
-覆盖公开店铺资料、商品目录、后台分类与商品管理、管理员会话和图片上传。
+覆盖公开及后台店铺资料、商品目录、后台分类与商品管理、管理员会话和图片上传。
 
 商品列表使用 page、pageSize 和 { items, total }。页码超过范围时 items 为空。分类列表一次返回全部匹配分类，格式仍为 { items, total }，其中 total 等于 items.length。
 
@@ -24,6 +24,8 @@ INVALID_REQUEST 可以附带 fieldErrors。键为字段路径，如 name 或 det
 | 接口 | 用途 | 登录 | 成功状态 |
 | --- | --- | --- | --- |
 | GET `/api/shop` | 查看店铺资料 | 无需 | 200 |
+| GET `/api/admin/shop` | 读取当前店铺资料 | 需要 | 200 |
+| PATCH `/api/admin/shop` | 修改店铺资料 | 需要 | 200 |
 | GET `/api/categories` | 查看分类 | 无需 | 200 |
 | GET `/api/products` | 浏览和搜索商品 | 无需 | 200 |
 | GET `/api/products/{id}` | 查看商品详情 | 无需 | 200 |
@@ -43,7 +45,9 @@ INVALID_REQUEST 可以附带 fieldErrors。键为字段路径，如 name 或 det
 
 ## 行为约定
 
-- **查看店铺资料**　返回店名 name、联系电话 phone 和客服微信引导文案 wechatContactText，均来自服务端部署配置。
+- **查看店铺资料**　返回当前保存的店名 name、联系电话 phone 和客服微信引导文案 wechatContactText，响应结构沿用 ShopSchema。后台保存成功后，下一次请求即读取新资料。响应使用 Cache-Control: no-store。
+- **读取当前店铺资料**　与公开接口读取同一份已保存的资料。首次启动且数据库还未保存资料时，用 SHOP_NAME、SHOP_PHONE 和 SHOP_WECHAT_CONTACT_TEXT 初始化并持久化。缺省值依次为「威马五金」、空字符串、空字符串。资料一旦保存，重启或修改环境变量不会覆盖它。成功响应续期，且禁止缓存。
+- **修改店铺资料**　用 application/json 提交至少一个字段。三项都只接受字符串并去除首尾空白。店名必有内容，最多 100 个字符。 联系电话最多 50 个字符，允许区号，只能填数字、普通空格、加号、减号和英文圆括号。此字符限制用于后台提交。 客服微信引导文案为最多 300 个字符的纯文本，允许换行。保留正文内部的换行，商城按原样分行显示。 传空字符串可清空联系电话或引导文案，省略字段保持原值。未知字段、空请求对象及 null 均返回 INVALID_REQUEST，字段校验错误附中文 fieldErrors。 所有字段校验后一次保存，成功返回完整资料。保存失败返回 INTERNAL_ERROR。
 - **查看分类**　一次返回所有至少关联一件上架商品的分类。已上架的缺货商品计入。按 sortOrder 升序，再按 createdAt 升序排列。排序值和创建时间均相同时按 id 升序稳定排列。
 - **浏览和搜索商品**　只返回上架商品，包含缺货商品。分类和关键字可同时使用。列表使用 mainImage.thumbnailUrl。置顶优先，其后按 sortOrder 升序、createdAt 降序排列。前三项均相同时按 id 升序，保证分页稳定。
 - **查看商品详情**　下架与不存在均返回 PRODUCT_NOT_FOUND。缺货商品仍返回详情。
