@@ -196,7 +196,7 @@ export function Home() {
       <div className="space-y-7 px-5 pt-3">
         {!filtered && <BannerCarousel onAction={onBanner} />}
 
-        {/* 分类：不超过 6 个时排满一行，更多时左右滑动 */}
+        {/* 分类：不超过 6 个时按数量等分一行、左右对称（店主要求，#82），更多时左右滑动 */}
         {(categoryList.length > 0 || categories.state.status === "loading") && (
           <nav aria-labelledby="category-title">
             <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -208,10 +208,10 @@ export function Home() {
                 <ChevronRightIcon size={16} />
               </Link>
             </div>
-            <ul className={`flex ${fits ? "-mx-1" : "no-scrollbar -mx-5 gap-1 overflow-x-auto px-4"}`}>
+            <ul className={`flex ${fits ? "" : "no-scrollbar -mx-5 gap-1 overflow-x-auto px-4"}`}>
               {categories.state.status === "loading" &&
                 Array.from({ length: 5 }, (_, i) => (
-                  <li key={i} className="flex max-w-[88px] flex-1 flex-col items-center gap-2" aria-hidden="true">
+                  <li key={i} className="flex flex-1 flex-col items-center gap-2" aria-hidden="true">
                     <span className="skeleton h-[60px] w-[60px] rounded-[18px]" />
                     <span className="skeleton h-3 w-10" />
                   </li>
@@ -219,7 +219,7 @@ export function Home() {
               {categoryList.map((category) => {
                 const active = category.id === categoryId;
                 return (
-                  <li key={category.id} className={fits ? "min-w-0 max-w-[88px] flex-1" : "w-[72px] shrink-0"}>
+                  <li key={category.id} className={fits ? "min-w-0 flex-1" : "w-[72px] shrink-0"}>
                     <button
                       type="button"
                       aria-pressed={active}
