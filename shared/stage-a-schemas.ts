@@ -49,6 +49,10 @@ export const ShopPatchSchema = ShopSchema.extend({
 const categoryName = requiredText("分类名称", 50).describe("分类名称，去除首尾空白。");
 const sortOrder = z.int("排序值必须是整数。").min(0, "排序值不能小于 0。")
   .max(9999, "排序值不能超过 9999。").describe("显示顺序，数字越小越靠前。");
+const imagePath = z.string("图片路径必须是文字。")
+  .regex(/^\/uploads\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/, "图片路径格式不正确。");
+const categoryIconImageId = IdSchema.nullable()
+  .describe("上传接口返回的方形图标 ID。传 null 清除，PATCH 省略时保持原值。");
 
 export const CategoryCreateSchema = z.strictObject({
   name: categoryName,
@@ -63,7 +67,18 @@ export const CategoryPatchSchema = z.strictObject({
   "请至少填写一项修改内容。",
 ).meta({ minProperties: 1 });
 
-export const CategorySchema = z.strictObject({ id: IdSchema, name: categoryName, sortOrder, createdAt }, objectError);
+export const CategoryWithIconCreateSchema = CategoryCreateSchema.extend({ iconImageId: categoryIconImageId.optional() });
+export const CategoryWithIconPatchSchema = CategoryPatchSchema
+  .safeExtend({ iconImageId: categoryIconImageId.optional() }).meta({ minProperties: 1 });
+
+export const CategorySchema = z.strictObject({
+  id: IdSchema,
+  name: categoryName,
+  sortOrder,
+  createdAt,
+  iconUrl: imagePath.nullable().optional()
+    .describe("同源方形缩略图路径。未设置或已不可用时返回 null，旧版后端可能省略。两种情况均使用内置图标。"),
+}, objectError);
 export const CategoryListQuerySchema = z.strictObject({}, "分类列表一次返回全部，无需查询参数。");
 export const CategoryListSchema = listOf(CategorySchema).refine(
   ({ items, total }) => total === items.length,
@@ -82,15 +97,65 @@ export const AdminProductQuerySchema = ProductQuerySchema.extend({
     .optional().describe("按缺货状态筛选。"),
 });
 
-const imagePath = z.string("图片路径必须是文字。")
-  .regex(/^\/uploads\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/, "图片路径格式不正确。");
-
 export const ImagePathsSchema = z.strictObject({
   imageUrl: imagePath.describe("同源压缩图路径，长边不超过 1600 像素。"),
   thumbnailUrl: imagePath.describe("同源列表缩略图路径，长边不超过 480 像素。"),
 }, objectError);
 
 export const AdminImageSchema = ImagePathsSchema.extend({ id: IdSchema });
+
+export const maxBanners = 5;
+export const bannerTextLimits = { title: 16, description: 30, buttonText: 6 } as const;
+
+const bannerFields = {
+  title: text("轮播标题", bannerTextLimits.title).regex(/^[^\r\n]*$/, "轮播标题请填写为单行文字。")
+    .describe(`最多 ${bannerTextLimits.title} 个字符，可为空。手机端可自动排两行。`),
+  description: text("轮播说明", bannerTextLimits.description).regex(/^[^\r\n]*$/, "轮播说明请填写为单行文字。")
+    .describe(`一句纯文本说明，最多 ${bannerTextLimits.description} 个字符，可为空。`),
+  buttonText: requiredText("按钮文字", bannerTextLimits.buttonText).regex(/^[^\r\n]*$/, "按钮文字请填写为单行文字。")
+    .describe(`纯文本按钮文字，1 至 ${bannerTextLimits.buttonText} 个字符。`),
+  categoryId: IdSchema.describe("点击后进入的商品分类 ID。"),
+};
+
+const bannerAdminFields = {
+  backgroundImageId: IdSchema.describe("图片上传接口返回的背景图 ID。"),
+  isVisible: z.boolean("请选择是否显示轮播图。").describe("管理员设置的显示开关。"),
+  sortOrder,
+};
+
+export const BannerCreateSchema = z.strictObject({
+  ...bannerFields,
+  ...bannerAdminFields,
+  title: bannerFields.title.default(""),
+  description: bannerFields.description.default(""),
+  buttonText: bannerFields.buttonText.default("去看看"),
+  isVisible: bannerAdminFields.isVisible.default(false),
+  sortOrder: sortOrder.default(0),
+}, objectError);
+
+export const BannerPatchSchema = z.strictObject({ ...bannerFields, ...bannerAdminFields }, objectError)
+  .partial().refine((value) => Object.keys(value).length > 0, "请至少填写一项修改内容。").meta({ minProperties: 1 });
+
+export const BannerSchema = z.strictObject({
+  id: IdSchema,
+  ...bannerFields,
+  backgroundImageUrl: imagePath.describe("同源压缩图路径。"),
+}, objectError);
+
+export const AdminBannerSchema = BannerSchema.extend({
+  ...bannerAdminFields,
+  createdAt,
+  backgroundImageUrl: imagePath.nullable().describe("同源压缩图路径，图片文件不可用时为 null。"),
+});
+
+export const BannerListQuerySchema = z.strictObject({}, "轮播图列表一次返回全部，无需查询参数。");
+function bannerList<T extends z.ZodType>(item: T) {
+  return listOf(item).extend({
+    items: z.array(item, "轮播图列表必须是数组。").max(maxBanners, `最多返回 ${maxBanners} 张轮播图。`),
+  }).refine(({ items, total }) => total === items.length, { path: ["total"], error: "总条数须等于轮播图数量。" });
+}
+export const BannerListSchema = bannerList(BannerSchema);
+export const AdminBannerListSchema = bannerList(AdminBannerSchema);
 
 const productFields = {
   name: requiredText("商品名", 100).describe("商品名，去除首尾空白。"),
@@ -197,6 +262,10 @@ export const ImageUploadSchema = z.strictObject({
 export type Shop = z.output<typeof ShopSchema>;
 export type ShopPatch = z.output<typeof ShopPatchSchema>;
 export type Category = z.output<typeof CategorySchema>;
+export type Banner = z.output<typeof BannerSchema>;
+export type AdminBanner = z.output<typeof AdminBannerSchema>;
+export type BannerCreate = z.input<typeof BannerCreateSchema>;
+export type BannerPatch = z.input<typeof BannerPatchSchema>;
 export type ProductListItem = z.output<typeof ProductListItemSchema>;
 export type ProductDetail = z.output<typeof ProductDetailSchema>;
 export type AdminProduct = z.output<typeof AdminProductSchema>;
