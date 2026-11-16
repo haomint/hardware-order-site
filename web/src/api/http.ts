@@ -23,6 +23,10 @@ import type {
   ProductQuery,
   Shop,
   ShopPatch,
+  Banner,
+  AdminBanner,
+  BannerCreate,
+  BannerPatch,
   UpdateProduct,
 } from "./types.ts";
 
@@ -87,6 +91,29 @@ const id = (value: string) => encodeURIComponent(value);
 
 export function getShop(): Promise<Shop> {
   return request("/api/shop");
+}
+
+// ── 首页轮播图（#70） ────────────────────────────────
+
+/** 公开：只返回能正常展示的轮播图；空列表表示首页用内置示例图。 */
+export function listBanners(): Promise<ListResult<Banner>> {
+  return request("/api/banners");
+}
+
+export function listAdminBanners(): Promise<ListResult<AdminBanner>> {
+  return request("/api/admin/banners");
+}
+
+export function createBanner(input: BannerCreate): Promise<AdminBanner> {
+  return request("/api/admin/banners", json("POST", input));
+}
+
+export function updateBanner(bannerId: string, patch: BannerPatch): Promise<AdminBanner> {
+  return request(`/api/admin/banners/${id(bannerId)}`, json("PATCH", patch));
+}
+
+export function deleteBanner(bannerId: string): Promise<void> {
+  return request(`/api/admin/banners/${id(bannerId)}`, { method: "DELETE" });
 }
 
 // ── 后台店铺资料 ──────────────────────────────────────
