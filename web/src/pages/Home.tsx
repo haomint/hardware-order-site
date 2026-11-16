@@ -229,7 +229,7 @@ export function Home() {
                       }}
                       className="flex w-full flex-col items-center gap-2 active:opacity-60"
                     >
-                      <CategoryIcon name={category.name} active={active} size={iconSize} />
+                      <CategoryIcon name={category.name} iconUrl={category.iconUrl} active={active} size={iconSize} />
                       <span className={`max-w-full truncate px-0.5 text-[13px] ${active ? "font-semibold text-brand" : "text-ink"}`}>
                         {category.name}
                       </span>

@@ -768,10 +768,18 @@ export function createCategory(input: CategoryInput): Promise<Category> {
       name,
       sortOrder: input.sortOrder ?? 0,
       createdAt: new Date().toISOString(),
+      iconUrl: input.iconImageId ? iconUrlOf(input.iconImageId) : null,
     };
     categories = [...categories, created];
     return created;
   });
+}
+
+/** 图标图片必须是已上传的图片；真实后端还会检查宽高相等，前端上传前已裁成方图。 */
+function iconUrlOf(imageId: string): string {
+  const image = images.get(imageId);
+  if (!image) fail(404, "IMAGE_NOT_FOUND", "图片不存在或上传已失效，请重新上传。");
+  return image.thumbnailUrl;
 }
 
 export function updateCategory(categoryId: string, patch: CategoryPatch): Promise<Category> {
@@ -779,7 +787,9 @@ export function updateCategory(categoryId: string, patch: CategoryPatch): Promis
     const current = findCategory(categoryId);
     const name = patch.name === undefined ? current.name : patch.name.trim();
     assertCategoryName(name, categoryId);
-    const updated = { ...current, name, sortOrder: patch.sortOrder ?? current.sortOrder };
+    const iconUrl =
+      patch.iconImageId === undefined ? (current.iconUrl ?? null) : patch.iconImageId === null ? null : iconUrlOf(patch.iconImageId);
+    const updated = { ...current, name, sortOrder: patch.sortOrder ?? current.sortOrder, iconUrl };
     categories = categories.map((c) => (c.id === categoryId ? updated : c));
     return updated;
   }, 180);
