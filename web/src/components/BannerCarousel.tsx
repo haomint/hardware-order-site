@@ -226,6 +226,17 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
     resumeTimer.current = window.setTimeout(() => setHeld(false), RESUME_MS);
   };
 
+  // 还没问到后台有没有设置轮播图：先放一块同样大小的灰底，避免先闪一下内置示例图再换成店主的图。
+  // 下面留出指示点的高度，多张时加载完不跳动。
+  if (custom === null) {
+    return (
+      <section aria-label="店铺横幅" aria-busy="true">
+        <div className="h-[188px] rounded-[22px] bg-page" />
+        <div className="mt-1.5 h-6" />
+      </section>
+    );
+  }
+
   return (
     <section aria-roledescription="轮播" aria-label="店铺横幅" className="relative">
       <div
@@ -252,8 +263,9 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
         ))}
       </div>
 
-      {/* 指示点：卡片下方的灰色小点，当前页颜色更深；只有一张时不显示 */}
-      <div className={`mt-1.5 flex justify-center ${count < 2 ? "invisible" : ""}`}>
+      {/* 指示点：卡片下方的灰色小点，当前页颜色更深；只有一张时不显示，也不占位置（#97） */}
+      {count > 1 && (
+      <div className="mt-1.5 flex justify-center">
         <div className="flex items-center">
           {list.map((slide, i) => (
             <button
@@ -269,6 +281,7 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
           ))}
         </div>
       </div>
+      )}
     </section>
   );
 }

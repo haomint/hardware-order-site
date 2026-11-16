@@ -13,10 +13,23 @@ export const BANNER_LIMIT: typeof maxBanners = 5;
 
 const messageOf = (error: unknown) => (error instanceof ApiError ? error.message : "操作失败，请重试。");
 
+/** 首页实际显示的轮播图编号；取不到时返回 null（不提示，不影响管理）。 */
+const shownOnHome = () =>
+  api.listBanners().then(
+    (result) => new Set(result.items.map((b) => b.id)),
+    () => null,
+  );
+
 export function Banners() {
-  const loaded = useAsync(() => Promise.all([api.listAdminBanners(), api.listAdminCategories()]), []);
+  // 第三个是首页实际显示的轮播图：后端会去掉指向「没有上架商品的分类」的那几张，用它判断哪些首页看不到。
+  // 拿不到时不影响管理，只是不提示。
+  const loaded = useAsync(
+    () => Promise.all([api.listAdminBanners(), api.listAdminCategories(), shownOnHome()]),
+    [],
+  );
   const [items, setItems] = useState<AdminBanner[] | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [onHome, setOnHome] = useState<Set<string> | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<AdminBanner | null>(null);
 
@@ -27,9 +40,14 @@ export function Banners() {
     if (loaded.state.status !== "ready") return;
     setItems(loaded.state.data[0].items);
     setCategories(loaded.state.data[1].items);
+    setOnHome(loaded.state.data[2]);
   }, [loaded.state]);
 
-  const reload = async () => setItems((await api.listAdminBanners()).items);
+  const refreshOnHome = async () => setOnHome(await shownOnHome());
+  const reload = async () => {
+    setItems((await api.listAdminBanners()).items);
+    await refreshOnHome();
+  };
 
   // 调整顺序：按新顺序给每张写入 0、1、2…，只提交变化的那几张
   const move = async (index: number, delta: -1 | 1) => {
@@ -57,7 +75,8 @@ export function Banners() {
     try {
       const updated = await api.updateBanner(banner.id, { isVisible });
       setItems((list) => list?.map((b) => (b.id === banner.id ? updated : b)) ?? null);
-      toast(isVisible ? "已显示在首页" : "已隐藏");
+      toast(isVisible ? "已打开显示" : "已隐藏");
+      await refreshOnHome();
     } catch (error) {
       toast(messageOf(error));
     } finally {
@@ -86,7 +105,9 @@ export function Banners() {
 
   const full = items.length >= BANNER_LIMIT;
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? "分类已不存在";
-  const shownCount = items.filter((b) => b.isVisible && b.backgroundImageUrl).length;
+  // 打开了显示、图片也正常，首页却没有它：说明指向的分类下还没有上架商品（#97）。
+  const hiddenByCategory = (b: AdminBanner) => Boolean(onHome && b.isVisible && b.backgroundImageUrl && !onHome.has(b.id));
+  const shownCount = items.filter((b) => b.isVisible && b.backgroundImageUrl && !hiddenByCategory(b)).length;
 
   return (
     <div className="space-y-4 pb-6">
@@ -134,6 +155,11 @@ export function Banners() {
                     <span className="min-w-0 truncate">点击进入「{categoryName(banner.categoryId)}」</span>
                     {!banner.isVisible && <Badge tone="gray">已隐藏</Badge>}
                   </div>
+                  {hiddenByCategory(banner) && (
+                    <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] leading-snug text-amber-800">
+                      首页暂时看不到这张：「{categoryName(banner.categoryId)}」分类下还没有上架的商品。上架商品后会自动显示，也可以点「修改」换一个分类。
+                    </p>
+                  )}
                   <Switch
                     label="在首页显示"
                     checked={banner.isVisible}
