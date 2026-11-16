@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { api, ApiError } from "../api/index.ts";
 import type { Category } from "../api/index.ts";
@@ -154,22 +154,29 @@ function CategoryRow({ category, onSaved, onDelete }: { category: Category; onSa
   const [uploading, setUploading] = useState(false);
   const shownIcon = icon === undefined ? (category.iconUrl ?? null) : (icon?.url ?? null);
 
+  // 每次开始编辑、取消或换图都换一代：上传还没完成就点了「取消」，回来的结果属于旧一代，直接丢弃，
+  // 不会在下次打开编辑时冒出来，也不会被下一次保存带上。
+  const uploadGeneration = useRef(0);
+
   const pickIcon = async (file: File | undefined) => {
     if (!file) return;
+    const mine = ++uploadGeneration.current;
     setUploading(true);
     setError("");
     try {
       const square = await prepareSquareImage(file);
       const uploaded = await api.uploadImage(square);
-      setIcon({ id: uploaded.id, url: uploaded.thumbnailUrl });
+      if (mine === uploadGeneration.current) setIcon({ id: uploaded.id, url: uploaded.thumbnailUrl });
     } catch (caught) {
-      setError(caught instanceof ImageError ? caught.message : messageOf(caught));
+      if (mine === uploadGeneration.current) setError(caught instanceof ImageError ? caught.message : messageOf(caught));
     } finally {
-      setUploading(false);
+      if (mine === uploadGeneration.current) setUploading(false);
     }
   };
 
   const cancel = () => {
+    uploadGeneration.current += 1;
+    setUploading(false);
     setName(category.name);
     setSort(String(category.sortOrder));
     setIcon(undefined);
