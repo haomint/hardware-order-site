@@ -119,6 +119,20 @@ export const ChatIcon = (p: IconProps) => (
   </Icon>
 );
 
+/** 微信样式图标：白色的一大一小两个对话气泡，放在微信绿的圆底上用。eye 是气泡上「眼睛」的颜色，和底色一致。 */
+export const WeChatIcon = ({ size = 22, eye = "#07c160" }: { size?: number; eye?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+    <ellipse cx="9.5" cy="9.5" rx="7.5" ry="6.3" fill="#fff" />
+    <path d="M4.8 14 4.2 17.4 8 15.4Z" fill="#fff" />
+    <circle cx="7" cy="8.3" r="1" fill={eye} />
+    <circle cx="12" cy="8.3" r="1" fill={eye} />
+    <ellipse cx="15.8" cy="15.2" rx="6" ry="5" fill="#fff" stroke={eye} strokeWidth="1.4" />
+    <path d="M19.8 18.4 20.6 21.2 17.4 19.6Z" fill="#fff" />
+    <circle cx="13.9" cy="14.3" r="0.8" fill={eye} />
+    <circle cx="17.7" cy="14.3" r="0.8" fill={eye} />
+  </svg>
+);
+
 export const BadgeCheckIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M12 3 5 6v5c0 4.5 3 8.2 7 10 4-1.8 7-5.5 7-10V6z" />
