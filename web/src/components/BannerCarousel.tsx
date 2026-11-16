@@ -206,8 +206,10 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
     setIndex(0);
   }, [list, goTo]);
 
+  // 加载中显示的是灰色占位、还没有可滑动的轨道：等加载完再开始计时，否则这次计时落空、之后不会再排（#98 审查）。
+  const ready = custom !== null;
   useEffect(() => {
-    if (held || hidden || reduced || count < 2) return;
+    if (!ready || held || hidden || reduced || count < 2) return;
     const timer = window.setTimeout(() => {
       const el = track.current;
       if (!el) return;
@@ -215,7 +217,7 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
       goTo(raw + 1);
     }, AUTOPLAY_MS);
     return () => window.clearTimeout(timer);
-  }, [index, held, hidden, reduced, goTo, count]);
+  }, [ready, index, held, hidden, reduced, goTo, count]);
 
   const hold = () => {
     window.clearTimeout(resumeTimer.current);
