@@ -4573,22 +4573,22 @@
                           },
                           "title": {
                             "type": "string",
-                            "maxLength": 24,
+                            "maxLength": 16,
                             "pattern": "^[^\\r\\n]*$",
-                            "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                            "description": "最多 16 个字符，可为空。手机端可自动排两行。"
                           },
                           "description": {
                             "type": "string",
-                            "maxLength": 60,
+                            "maxLength": 30,
                             "pattern": "^[^\\r\\n]*$",
-                            "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                            "description": "一句纯文本说明，最多 30 个字符，可为空。"
                           },
                           "buttonText": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 12,
+                            "maxLength": 6,
                             "pattern": "^[^\\r\\n]*$",
-                            "description": "纯文本按钮文字，1 至 12 个字符。"
+                            "description": "纯文本按钮文字，1 至 6 个字符。"
                           },
                           "categoryId": {
                             "type": "string",
@@ -4729,22 +4729,22 @@
                           },
                           "title": {
                             "type": "string",
-                            "maxLength": 24,
+                            "maxLength": 16,
                             "pattern": "^[^\\r\\n]*$",
-                            "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                            "description": "最多 16 个字符，可为空。手机端可自动排两行。"
                           },
                           "description": {
                             "type": "string",
-                            "maxLength": 60,
+                            "maxLength": 30,
                             "pattern": "^[^\\r\\n]*$",
-                            "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                            "description": "一句纯文本说明，最多 30 个字符，可为空。"
                           },
                           "buttonText": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 12,
+                            "maxLength": 6,
                             "pattern": "^[^\\r\\n]*$",
-                            "description": "纯文本按钮文字，1 至 12 个字符。"
+                            "description": "纯文本按钮文字，1 至 6 个字符。"
                           },
                           "categoryId": {
                             "type": "string",
@@ -4927,7 +4927,7 @@
           "后台轮播图"
         ],
         "summary": "新增轮播图",
-        "description": "必须提供可用背景图的 backgroundImageId 和已存在的 categoryId。title 最多 24 字符，description 最多 60 字符，均可留空。buttonText 为 1 至 12 字符，默认为「去看看」。三项均为单行纯文本并去除首尾空白。默认隐藏，sortOrder 默认为 0。最多保存 5 张，隐藏图也计入。",
+        "description": "必须提供可用背景图的 backgroundImageId 和已存在的 categoryId。 title 最多 16 字符，description 最多 30 字符，均可留空。 buttonText 为 1 至 6 字符，默认为「去看看」。三项均为单行纯文本并去除首尾空白。 默认隐藏，sortOrder 默认为 0。最多保存 5 张，隐藏图也计入。",
         "security": [
           {
             "adminSession": []
@@ -4949,22 +4949,22 @@
                     },
                     "title": {
                       "type": "string",
-                      "maxLength": 24,
+                      "maxLength": 16,
                       "pattern": "^[^\\r\\n]*$",
-                      "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                      "description": "最多 16 个字符，可为空。手机端可自动排两行。"
                     },
                     "description": {
                       "type": "string",
-                      "maxLength": 60,
+                      "maxLength": 30,
                       "pattern": "^[^\\r\\n]*$",
-                      "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                      "description": "一句纯文本说明，最多 30 个字符，可为空。"
                     },
                     "buttonText": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 12,
+                      "maxLength": 6,
                       "pattern": "^[^\\r\\n]*$",
-                      "description": "纯文本按钮文字，1 至 12 个字符。"
+                      "description": "纯文本按钮文字，1 至 6 个字符。"
                     },
                     "categoryId": {
                       "type": "string",
@@ -5224,24 +5224,24 @@
                   "title": {
                     "default": "",
                     "type": "string",
-                    "maxLength": 24,
+                    "maxLength": 16,
                     "pattern": "^[^\\r\\n]*$",
-                    "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                    "description": "最多 16 个字符，可为空。手机端可自动排两行。"
                   },
                   "description": {
                     "default": "",
                     "type": "string",
-                    "maxLength": 60,
+                    "maxLength": 30,
                     "pattern": "^[^\\r\\n]*$",
-                    "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                    "description": "一句纯文本说明，最多 30 个字符，可为空。"
                   },
                   "buttonText": {
                     "default": "去看看",
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 12,
+                    "maxLength": 6,
                     "pattern": "^[^\\r\\n]*$",
-                    "description": "纯文本按钮文字，1 至 12 个字符。"
+                    "description": "纯文本按钮文字，1 至 6 个字符。"
                   },
                   "categoryId": {
                     "type": "string",
@@ -5308,22 +5308,22 @@
                     },
                     "title": {
                       "type": "string",
-                      "maxLength": 24,
+                      "maxLength": 16,
                       "pattern": "^[^\\r\\n]*$",
-                      "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                      "description": "最多 16 个字符，可为空。手机端可自动排两行。"
                     },
                     "description": {
                       "type": "string",
-                      "maxLength": 60,
+                      "maxLength": 30,
                       "pattern": "^[^\\r\\n]*$",
-                      "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                      "description": "一句纯文本说明，最多 30 个字符，可为空。"
                     },
                     "buttonText": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 12,
+                      "maxLength": 6,
                       "pattern": "^[^\\r\\n]*$",
-                      "description": "纯文本按钮文字，1 至 12 个字符。"
+                      "description": "纯文本按钮文字，1 至 6 个字符。"
                     },
                     "categoryId": {
                       "type": "string",
@@ -5570,22 +5570,22 @@
                 "properties": {
                   "title": {
                     "type": "string",
-                    "maxLength": 24,
+                    "maxLength": 16,
                     "pattern": "^[^\\r\\n]*$",
-                    "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                    "description": "最多 16 个字符，可为空。手机端可自动排两行。"
                   },
                   "description": {
                     "type": "string",
-                    "maxLength": 60,
+                    "maxLength": 30,
                     "pattern": "^[^\\r\\n]*$",
-                    "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                    "description": "一句纯文本说明，最多 30 个字符，可为空。"
                   },
                   "buttonText": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 12,
+                    "maxLength": 6,
                     "pattern": "^[^\\r\\n]*$",
-                    "description": "纯文本按钮文字，1 至 12 个字符。"
+                    "description": "纯文本按钮文字，1 至 6 个字符。"
                   },
                   "categoryId": {
                     "type": "string",

@@ -28,6 +28,7 @@ import {
   ProductQuerySchema,
   ShopPatchSchema,
   ShopSchema,
+  bannerTextLimits,
   maxBanners,
 } from "./stage-a-schemas.ts";
 
@@ -331,7 +332,12 @@ export const storefrontMedia = {
   createBanner: {
     method: "post", path: "/api/admin/banners", tag: bannerTag, admin: true,
     summary: "新增轮播图",
-    description: `必须提供可用背景图的 backgroundImageId 和已存在的 categoryId。title 最多 24 字符，description 最多 60 字符，均可留空。buttonText 为 1 至 12 字符，默认为「去看看」。三项均为单行纯文本并去除首尾空白。默认隐藏，sortOrder 默认为 0。最多保存 ${maxBanners} 张，隐藏图也计入。`,
+    description: [
+      "必须提供可用背景图的 backgroundImageId 和已存在的 categoryId。",
+      `title 最多 ${bannerTextLimits.title} 字符，description 最多 ${bannerTextLimits.description} 字符，均可留空。`,
+      `buttonText 为 1 至 ${bannerTextLimits.buttonText} 字符，默认为「去看看」。三项均为单行纯文本并去除首尾空白。`,
+      `默认隐藏，sortOrder 默认为 0。最多保存 ${maxBanners} 张，隐藏图也计入。`,
+    ].join(" "),
     body: { schema: BannerCreateSchema },
     success: { status: 201, schema: AdminBannerSchema },
     errors: ["CATEGORY_NOT_FOUND", "IMAGE_NOT_FOUND", "BANNER_LIMIT_REACHED"],

@@ -105,14 +105,15 @@ export const ImagePathsSchema = z.strictObject({
 export const AdminImageSchema = ImagePathsSchema.extend({ id: IdSchema });
 
 export const maxBanners = 5;
+export const bannerTextLimits = { title: 16, description: 30, buttonText: 6 } as const;
 
 const bannerFields = {
-  title: text("轮播标题", 24).regex(/^[^\r\n]*$/, "轮播标题请填写为单行文字。")
-    .describe("最多 24 个字符，可为空。手机端可自动排两行。"),
-  description: text("轮播说明", 60).regex(/^[^\r\n]*$/, "轮播说明请填写为单行文字。")
-    .describe("一句纯文本说明，最多 60 个字符，可为空。"),
-  buttonText: requiredText("按钮文字", 12).regex(/^[^\r\n]*$/, "按钮文字请填写为单行文字。")
-    .describe("纯文本按钮文字，1 至 12 个字符。"),
+  title: text("轮播标题", bannerTextLimits.title).regex(/^[^\r\n]*$/, "轮播标题请填写为单行文字。")
+    .describe(`最多 ${bannerTextLimits.title} 个字符，可为空。手机端可自动排两行。`),
+  description: text("轮播说明", bannerTextLimits.description).regex(/^[^\r\n]*$/, "轮播说明请填写为单行文字。")
+    .describe(`一句纯文本说明，最多 ${bannerTextLimits.description} 个字符，可为空。`),
+  buttonText: requiredText("按钮文字", bannerTextLimits.buttonText).regex(/^[^\r\n]*$/, "按钮文字请填写为单行文字。")
+    .describe(`纯文本按钮文字，1 至 ${bannerTextLimits.buttonText} 个字符。`),
   categoryId: IdSchema.describe("点击后进入的商品分类 ID。"),
 };
 
