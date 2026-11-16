@@ -12,7 +12,7 @@ import type { BannerAction } from "../components/BannerCarousel.tsx";
 import { CategoryIcon } from "../components/Art.tsx";
 import { CartBadge, TabBar } from "../components/TabBar.tsx";
 import { CartIcon, ChevronRightIcon, CloseIcon, PhoneIcon, SearchIcon } from "../components/icons.tsx";
-import { telHref } from "../lib/format.ts";
+import { openContact } from "../components/ContactSheet.tsx";
 
 const PAGE_SIZE = 20;
 /** 分类不超过这个数时平均排满一行，超过时可左右滑动。 */
@@ -133,14 +133,16 @@ export function Home() {
       {/* 头部：店名（大标题）、电话、购物车 */}
       <header className="flex items-center gap-1 px-5 pb-1 pt-5">
         <h1 className="headline min-w-0 flex-1 truncate text-[30px] font-semibold leading-tight text-ink">{shop?.name ?? " "}</h1>
-        {shop?.phone && (
-          <a
-            href={telHref(shop.phone)}
-            aria-label={`拨打店铺电话 ${shop.phone}`}
+        {/* 和底部「联系店铺」一样，弹出电话和微信（店主要求，#95） */}
+        {shop && (
+          <button
+            type="button"
+            onClick={openContact}
+            aria-label="联系店铺"
             className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink active:bg-page"
           >
             <PhoneIcon size={23} strokeWidth={1.7} />
-          </a>
+          </button>
         )}
         <Link
           to="/cart"

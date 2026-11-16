@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useShop } from "../lib/shop.tsx";
 import { copyText } from "../lib/clipboard.ts";
 import { toast } from "./Feedback.tsx";
-import { ChatIcon, CloseIcon, CopyIcon, PhoneIcon } from "./icons.tsx";
+import { CloseIcon, CopyIcon, PhoneIcon, WeChatIcon } from "./icons.tsx";
 import { telHref } from "../lib/format.ts";
 
 // 「联系店铺」面板：任何页面调用 openContact() 打开，全站只挂载一个 <ContactSheet />。
@@ -81,7 +81,7 @@ export function ContactSheet() {
           {wechat && (
             <div className="flex items-center gap-3 rounded-card bg-page p-4">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#07c160] text-white">
-                <ChatIcon size={20} />
+                <WeChatIcon size={28} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-semibold text-ink">微信联系</span>
