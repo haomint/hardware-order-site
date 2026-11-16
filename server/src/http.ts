@@ -7,7 +7,7 @@ import { bodyLimit } from "hono/body-limit";
 import { getCookie, setCookie } from "hono/cookie";
 import { cors } from "hono/cors";
 import {
-  AdminSessionCookieName, ApiErrorSchema, StageCApiErrorSchema, stageA, stageB, stageC,
+  AdminSessionCookieName, ApiErrorSchema, StageCApiErrorSchema, stageA, stageB, stageC, storefrontMedia,
 } from "../../shared/index.ts";
 import { createAuth } from "./auth.ts";
 import { createAdminOrders } from "./admin-orders.ts";
@@ -19,6 +19,7 @@ import { createOrders, createOrderSubmissionLimiter } from "./orders.ts";
 import { orderCsvDisposition, streamOrderCsv } from "./order-csv.ts";
 import { createOrderNotifications } from "./order-notifications.ts";
 import { createShopSettings } from "./shop-settings.ts";
+import { createBanners } from "./banners.ts";
 import type { SendNotificationMail } from "./notification-email.ts";
 
 type NodeConnection = { incoming: IncomingMessage };
@@ -138,12 +139,13 @@ export function createApp(
   const app = new Hono<HttpEnv>();
   const shop = createShopSettings(db, config.shopDefaults);
   const auth = createAuth(db, now);
-  const catalog = createCatalog(db, now);
+  const images = createImages(db, config.uploadDir, now);
+  const catalog = createCatalog(db, now, images);
+  const banners = createBanners(db, now, images);
   const notifications = createOrderNotifications(db, config, now, wecomRequest, sendMail);
   const orders = createOrders(db, catalog.findPublicItem, now, notifications.enqueue);
   const adminOrders = createAdminOrders(db, now);
   const limitOrderSubmission = createOrderSubmissionLimiter(now);
-  const images = createImages(db, config.uploadDir, now);
   const queueUpload = uploadQueue();
 
   function writeCookie(c: ApiContext, token: string, maxAge: number) {
@@ -232,7 +234,8 @@ export function createApp(
   add(stageA.getShop, shop.get);
   add(stageA.getAdminShop, shop.get);
   add(stageA.updateAdminShop, ({ body }) => shop.patch(body));
-  add(stageA.listCategories, () => catalog.listCategories(false));
+  add(storefrontMedia.listCategories, () => catalog.listCategories(false));
+  add(storefrontMedia.listBanners, () => banners.list());
   add(stageA.listProducts, ({ query }) => catalog.listProducts(query));
   add(stageA.getProduct, ({ params }) => catalog.getProduct(params.id.toLowerCase()));
   add(stageB.lookupCart, ({ body }) => orders.lookupCart(body.productIds));
@@ -285,18 +288,36 @@ export function createApp(
     return undefined;
   });
 
-  add(stageA.listAdminCategories, () => catalog.listCategories(true));
-  add(stageA.createCategory, ({ body }) => catalog.createCategory(body));
-  add(stageA.updateCategory, ({ params, body }) => catalog.updateCategory(params.id.toLowerCase(), body));
-  add(stageA.deleteCategory, ({ params }) => {
+  add(storefrontMedia.listAdminCategories, () => catalog.listCategories(true));
+  add(storefrontMedia.createCategory, ({ body }) => catalog.createCategory(body));
+  add(storefrontMedia.updateCategory, async ({ params, body }) => {
+    const category = await catalog.updateCategory(params.id.toLowerCase(), body);
+    images.cleanup();
+    return category;
+  });
+  add(storefrontMedia.deleteCategory, ({ params }) => {
     catalog.deleteCategory(params.id.toLowerCase());
+    images.cleanup();
+    return undefined;
+  });
+
+  add(storefrontMedia.listAdminBanners, () => banners.listAdmin());
+  add(storefrontMedia.createBanner, ({ body }) => banners.create(body));
+  add(storefrontMedia.updateBanner, ({ params, body }) => {
+    const banner = banners.update(params.id.toLowerCase(), body);
+    images.cleanup();
+    return banner;
+  });
+  add(storefrontMedia.deleteBanner, ({ params }) => {
+    banners.delete(params.id.toLowerCase());
+    images.cleanup();
     return undefined;
   });
 
   add(stageA.listAdminProducts, ({ query }) => catalog.listAdminProducts(query));
   add(stageA.getAdminProduct, ({ params }) => catalog.getAdminProduct(params.id.toLowerCase()));
   add(stageA.createProduct, ({ body }) => catalog.createProduct(body));
-  add(stageA.updateProduct, ({ params, body }) => {
+  add(storefrontMedia.updateProduct, ({ params, body }) => {
     const product = catalog.updateProduct(params.id.toLowerCase(), body);
     images.cleanup();
     return product;
@@ -307,7 +328,7 @@ export function createApp(
     return undefined;
   });
 
-  add(stageA.uploadImage, ({ body }) => images.upload(body.file));
+  add(storefrontMedia.uploadImage, ({ body }) => images.upload(body.file));
   app.get("/uploads/:filename", async (c) => {
     const stream = await images.read(c.req.param("filename"));
     if (!stream) return c.notFound();

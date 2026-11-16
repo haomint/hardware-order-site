@@ -42,7 +42,7 @@ function fixture(t: TestContext, request: typeof fetch, variables: NodeJS.Proces
   });
   const category = randomUUID();
   const image = randomUUID();
-  db.prepare("INSERT INTO categories VALUES (?, '工具', 0, ?)").run(category, time);
+  db.prepare("INSERT INTO categories (id, name, sort_order, created_at) VALUES (?, '工具', 0, ?)").run(category, time);
   db.prepare("INSERT INTO images VALUES (?, NULL)").run(image);
   const items = ["电钻", "钻头", "锤子", "扳手"].map((name, index) => {
     const productId = randomUUID();
