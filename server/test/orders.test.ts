@@ -29,7 +29,7 @@ function fixture(t: TestContext) {
 
   const categoryId = randomUUID();
   const imageId = randomUUID();
-  db.prepare("INSERT INTO categories VALUES (?, '工具', 0, ?)").run(categoryId, timestamp);
+  db.prepare("INSERT INTO categories (id, name, sort_order, created_at) VALUES (?, '工具', 0, ?)").run(categoryId, timestamp);
   db.prepare("INSERT INTO images VALUES (?, NULL)").run(imageId);
   function product(name: string, price: number | null, published = 1, outOfStock = 0) {
     const id = randomUUID();

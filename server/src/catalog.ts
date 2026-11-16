@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import {
   AdminProductQuerySchema,
-  CategoryCreateSchema,
-  CategoryPatchSchema,
+  CategoryWithIconCreateSchema,
+  CategoryWithIconPatchSchema,
   ProductWriteSchema,
   type AdminProduct,
   type ProductDetail,
@@ -12,9 +12,9 @@ import {
 } from "../../shared/index.ts";
 import { transaction } from "./db.ts";
 import { ApiFailure, validate } from "./errors.ts";
-import { adminImage, imagePaths } from "./images.ts";
+import { adminImage, imagePaths, type createImages } from "./images.ts";
 
-type CategoryRow = { id: string; name: string; sort_order: number; created_at: number };
+type CategoryRow = { id: string; name: string; sort_order: number; created_at: number; icon_image_id: string | null };
 type ProductWrite = ReturnType<typeof ProductWriteSchema.parse>;
 type ProductRow = {
   id: string;
@@ -34,9 +34,6 @@ type ProductRow = {
 };
 
 const date = (timestamp: number) => new Date(timestamp).toISOString();
-const categoryData = (row: CategoryRow) => ({
-  id: row.id, name: row.name, sortOrder: row.sort_order, createdAt: date(row.created_at),
-});
 const productFields = (row: ProductRow) => ({
   id: row.id, name: row.name, brand: row.brand, model: row.model, categoryId: row.category_id,
   priceCents: row.price_cents, unit: row.unit, isOutOfStock: Boolean(row.is_out_of_stock), createdAt: date(row.created_at),
@@ -60,7 +57,7 @@ function productBindings(product: ProductWrite) {
   };
 }
 
-export function createCatalog(db: DatabaseSync, now: () => number) {
+export function createCatalog(db: DatabaseSync, now: () => number, images: ReturnType<typeof createImages>) {
   const categories = db.prepare(`
     SELECT * FROM categories c
     WHERE :admin = 1 OR EXISTS (SELECT 1 FROM products p WHERE p.category_id = c.id AND p.is_published = 1)
@@ -68,10 +65,11 @@ export function createCatalog(db: DatabaseSync, now: () => number) {
   `);
   const categoryById = db.prepare("SELECT * FROM categories WHERE id = ?");
   const categoryByName = db.prepare("SELECT id FROM categories WHERE name = ?");
-  const insertCategory = db.prepare("INSERT INTO categories VALUES (?, ?, ?, ?)");
-  const updateCategory = db.prepare("UPDATE categories SET name = ?, sort_order = ? WHERE id = ?");
+  const insertCategory = db.prepare("INSERT INTO categories (id, name, sort_order, created_at, icon_image_id) VALUES (?, ?, ?, ?, ?)");
+  const updateCategory = db.prepare("UPDATE categories SET name = ?, sort_order = ?, icon_image_id = ? WHERE id = ?");
   const deleteCategory = db.prepare("DELETE FROM categories WHERE id = ?");
   const categoryInUse = db.prepare("SELECT 1 FROM products WHERE category_id = ? LIMIT 1");
+  const categoryHasBanners = db.prepare("SELECT 1 FROM storefront_banners WHERE category_id = ? LIMIT 1");
 
   const productById = db.prepare("SELECT * FROM products WHERE id = ?");
   const productImages = db.prepare("SELECT image_id FROM product_detail_images WHERE product_id = ? ORDER BY position");
@@ -90,12 +88,6 @@ export function createCatalog(db: DatabaseSync, now: () => number) {
   const deleteProduct = db.prepare("DELETE FROM products WHERE id = ?");
   const addDetail = db.prepare("INSERT INTO product_detail_images VALUES (?, ?, ?)");
   const removeDetails = db.prepare("DELETE FROM product_detail_images WHERE product_id = ?");
-  const claimImage = db.prepare("UPDATE images SET expires_at = NULL WHERE id = ? AND (expires_at IS NULL OR expires_at > ?)");
-  const releaseImage = db.prepare(`
-    UPDATE images SET expires_at = :now WHERE id = :id
-      AND NOT EXISTS (SELECT 1 FROM products WHERE main_image_id = :id)
-      AND NOT EXISTS (SELECT 1 FROM product_detail_images WHERE image_id = :id)
-  `);
   const filter = `
     WHERE (:admin = 1 OR is_published = 1)
       AND (:categoryId IS NULL OR category_id = :categoryId)
@@ -113,6 +105,13 @@ export function createCatalog(db: DatabaseSync, now: () => number) {
     const row = categoryById.get(id) as CategoryRow | undefined;
     if (!row) throw new ApiFailure("CATEGORY_NOT_FOUND");
     return row;
+  }
+
+  function categoryData(row: CategoryRow) {
+    return {
+      id: row.id, name: row.name, sortOrder: row.sort_order, createdAt: date(row.created_at),
+      iconUrl: row.icon_image_id === null ? null : images.urlIfAvailable(row.icon_image_id, "thumbnail"),
+    };
   }
 
   function requireAvailableCategoryName(name: string, id?: string) {
@@ -157,9 +156,7 @@ export function createCatalog(db: DatabaseSync, now: () => number) {
   }
 
   function claimImages(product: ProductWrite, timestamp: number) {
-    for (const id of imageIds(product.mainImageId, product.detailImageIds)) {
-      if (!claimImage.run(id, timestamp).changes) throw new ApiFailure("IMAGE_NOT_FOUND");
-    }
+    for (const id of imageIds(product.mainImageId, product.detailImageIds)) images.claim(id, timestamp);
   }
 
   function writeDetails(productId: string, ids: string[]) {
@@ -167,7 +164,7 @@ export function createCatalog(db: DatabaseSync, now: () => number) {
   }
 
   function releaseImages(ids: string[], timestamp: number) {
-    for (const id of ids) releaseImage.run({ id, now: timestamp });
+    for (const id of ids) images.release(id, timestamp);
   }
 
   function productPage(admin: boolean, query: ReturnType<typeof AdminProductQuerySchema.parse>) {
@@ -189,29 +186,41 @@ export function createCatalog(db: DatabaseSync, now: () => number) {
       const items = (categories.all({ admin: Number(admin) }) as CategoryRow[]).map(categoryData);
       return { items, total: items.length };
     },
-    createCategory(input: ReturnType<typeof CategoryCreateSchema.parse>) {
+    async createCategory(input: ReturnType<typeof CategoryWithIconCreateSchema.parse>) {
+      const icon = input.iconImageId?.toLowerCase() ?? null;
+      if (icon) await images.requireSquareIcon(icon);
       return transaction(db, () => {
         requireAvailableCategoryName(input.name);
         const id = randomUUID();
         const timestamp = now();
-        insertCategory.run(id, input.name, input.sortOrder, timestamp);
-        return { id, ...input, createdAt: date(timestamp) };
+        if (icon) images.claim(icon, timestamp);
+        insertCategory.run(id, input.name, input.sortOrder, timestamp, icon);
+        return categoryData(getCategory(id));
       });
     },
-    updateCategory(id: string, input: ReturnType<typeof CategoryPatchSchema.parse>) {
+    async updateCategory(id: string, input: ReturnType<typeof CategoryWithIconPatchSchema.parse>) {
+      const requestedIcon = input.iconImageId?.toLowerCase() ?? null;
+      if (requestedIcon) await images.requireSquareIcon(requestedIcon);
       return transaction(db, () => {
-        const current = categoryData(getCategory(id));
-        const next = { ...current, ...input };
-        requireAvailableCategoryName(next.name, id);
-        updateCategory.run(next.name, next.sortOrder, id);
-        return next;
+        const current = getCategory(id);
+        const name = input.name ?? current.name;
+        const sortOrder = input.sortOrder ?? current.sort_order;
+        const icon = input.iconImageId === undefined ? current.icon_image_id : requestedIcon;
+        requireAvailableCategoryName(name, id);
+        const timestamp = now();
+        if (requestedIcon) images.claim(requestedIcon, timestamp);
+        updateCategory.run(name, sortOrder, icon, id);
+        if (current.icon_image_id && current.icon_image_id !== icon) images.release(current.icon_image_id, timestamp);
+        return categoryData(getCategory(id));
       });
     },
     deleteCategory(id: string) {
       transaction(db, () => {
-        getCategory(id);
+        const { icon_image_id: icon } = getCategory(id);
         if (categoryInUse.get(id)) throw new ApiFailure("CATEGORY_IN_USE");
+        if (categoryHasBanners.get(id)) throw new ApiFailure("CATEGORY_HAS_BANNERS");
         deleteCategory.run(id);
+        if (icon) images.release(icon, now());
       });
     },
     listProducts(query: ReturnType<typeof AdminProductQuerySchema.parse>) {

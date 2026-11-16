@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -63,32 +63,79 @@ async function compress(file: File) {
 
 export function createImages(db: DatabaseSync, directory: string, now: () => number) {
   mkdirSync(directory, { recursive: true });
+  const unreferenced = `
+    NOT EXISTS (SELECT 1 FROM products WHERE main_image_id = images.id)
+    AND NOT EXISTS (SELECT 1 FROM product_detail_images WHERE image_id = images.id)
+    AND NOT EXISTS (SELECT 1 FROM categories WHERE icon_image_id = images.id)
+    AND NOT EXISTS (SELECT 1 FROM storefront_banners WHERE background_image_id = images.id)
+  `;
   const reserve = db.prepare("INSERT INTO images (id, expires_at) VALUES (?, 0)");
   const extend = db.prepare("UPDATE images SET expires_at = ? WHERE id = ?");
-  const expired = db.prepare("SELECT id FROM images WHERE expires_at <= ? ORDER BY expires_at LIMIT 100");
+  const expired = db.prepare(`
+    SELECT id FROM images WHERE expires_at <= ? AND ${unreferenced} ORDER BY expires_at LIMIT 100
+  `);
   const remove = db.prepare("DELETE FROM images WHERE id = ?");
+  const claim = db.prepare("UPDATE images SET expires_at = NULL WHERE id = ? AND (expires_at IS NULL OR expires_at > ?)");
+  const release = db.prepare(`UPDATE images SET expires_at = ? WHERE id = ? AND ${unreferenced}`);
+  const available = db.prepare("SELECT 1 FROM images WHERE id = ? AND (expires_at IS NULL OR expires_at > ?)");
+
+  function filePath(id: string, variant: "full" | "thumbnail") {
+    return join(directory, variant === "full" ? `${id}.jpg` : `${id}-thumb.jpg`);
+  }
+
+  function urlIfAvailable(id: string, variant: "full" | "thumbnail") {
+    try {
+      const info = statSync(filePath(id, variant), { throwIfNoEntry: false });
+      if (!info?.isFile() || info.size === 0) return null;
+      const paths = imagePaths(id);
+      return variant === "full" ? paths.imageUrl : paths.thumbnailUrl;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EACCES") return null;
+      throw error;
+    }
+  }
 
   function cleanup() {
     for (const { id } of expired.all(now()) as { id: string }[]) {
       try {
-        rmSync(join(directory, `${id}.jpg`), { force: true });
-        rmSync(join(directory, `${id}-thumb.jpg`), { force: true });
+        rmSync(filePath(id, "full"), { force: true });
+        rmSync(filePath(id, "thumbnail"), { force: true });
         remove.run(id);
       } catch (error) {
-        console.error("商品图片清理失败，下次重试。", id, error);
+        console.error("图片清理失败，下次重试。", id, error);
       }
     }
   }
 
   return {
     cleanup,
+    urlIfAvailable,
+    claim(id: string, timestamp: number) {
+      if (!claim.run(id, timestamp).changes) throw new ApiFailure("IMAGE_NOT_FOUND");
+    },
+    release(id: string, timestamp: number) {
+      release.run(timestamp, id);
+    },
+    async requireSquareIcon(id: string) {
+      if (!available.get(id, now()) || !urlIfAvailable(id, "thumbnail")) throw new ApiFailure("IMAGE_NOT_FOUND");
+      let size: { width?: number; height?: number };
+      try {
+        size = await sharp(filePath(id, "full")).metadata();
+      } catch {
+        throw new ApiFailure("IMAGE_NOT_FOUND");
+      }
+      if (!size.width || !size.height) throw new ApiFailure("IMAGE_NOT_FOUND");
+      if (size.width !== size.height) {
+        throw new ApiFailure("INVALID_REQUEST", { iconImageId: "请上传宽高相等的方形分类图标。" });
+      }
+    },
     async upload(file: File) {
       const { full, thumbnail } = await compress(file);
       const id = randomUUID();
       reserve.run(id);
       try {
-        writeFileSync(join(directory, `${id}.jpg`), full, { flag: "wx" });
-        writeFileSync(join(directory, `${id}-thumb.jpg`), thumbnail, { flag: "wx" });
+        writeFileSync(filePath(id, "full"), full, { flag: "wx" });
+        writeFileSync(filePath(id, "thumbnail"), thumbnail, { flag: "wx" });
         extend.run(now() + pendingLifetime, id);
       } catch (error) {
         cleanup();
