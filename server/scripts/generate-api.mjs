@@ -7,6 +7,7 @@ import {
   apiErrors,
   stageA,
   stageAInfo,
+  storefrontMedia,
   stageB,
   stageBInfo,
   stageBErrors,
@@ -185,7 +186,7 @@ function generateStage(name, info, routes, apiErrors, errorSchema) {
 
 const check = process.argv.includes("--check");
 const outputs = [
-  ...generateStage("stage-a", stageAInfo, stageA, apiErrors, ApiErrorSchema),
+  ...generateStage("stage-a", stageAInfo, { ...stageA, ...storefrontMedia }, apiErrors, ApiErrorSchema),
   ...generateStage("stage-b", stageBInfo, stageB, stageBErrors, StageBApiErrorSchema),
   ...generateStage("stage-c", stageCInfo, stageC, stageCErrors, StageCApiErrorSchema),
 ];

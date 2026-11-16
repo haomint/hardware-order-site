@@ -3,7 +3,7 @@
   "info": {
     "title": "五金订货网站 · 阶段 A 接口契约",
     "version": "0.1.0",
-    "description": "覆盖公开及后台店铺资料、商品目录、后台分类与商品管理、管理员会话和图片上传。\n\n商品列表使用 page、pageSize 和 { items, total }。页码超过范围时 items 为空。分类列表一次返回全部匹配分类，格式仍为 { items, total }，其中 total 等于 items.length。\n\n列表查询参数只接受文档列出的单值字段。请求体的未知字段视为参数错误。PATCH 省略的字段保持原值。\n\n商品参考单价用整数分。priceCents 为 null 时显示「价格面议」。品牌和型号未填写时返回空字符串，前台隐藏相应项。新增时可以省略，编辑时传空字符串可清空。已上架商品可以同时缺货。\n\n生产环境同源访问，后台使用 HttpOnly、Secure、SameSite=Lax、Path=/ 的 Cookie。后台写操作校验 Origin。开发环境可通过环境配置加入前端开发服务器的完整来源。跨端口直连时仅对配置的来源开放带凭据的 CORS，前端请求使用 credentials: include。仅本地 HTTP 开发可省略 Cookie 的 Secure 属性。\n\n登录成功后会话有效期为 30 天。每次需登录的后台接口成功返回时，从本次请求起重新计算 30 天有效期，同时续发 Cookie。会话到期或主动退出后需重新登录。会话和后台数据禁止缓存。\n\n公开商品目录应重新验证或禁用缓存，使上下架、缺货和删除变更及时生效。图片以同源根路径公开静态访问，使用不可猜测的随机文件名，可长期缓存。替换图片时使用新路径，源站清理图片后客户端可能仍持有旧缓存。\n\nINVALID_REQUEST 可以附带 fieldErrors。键为字段路径，如 name 或 detailImageIds.0，数组下标从 0 开始。值为简体中文提示。无法定位字段时使用 message。"
+    "description": "覆盖公开及后台店铺资料、商品目录、分类与图标、首页轮播图、后台商品管理、管理员会话和图片上传。\n\n商品列表使用 page、pageSize 和 { items, total }。页码超过范围时 items 为空。分类列表一次返回全部匹配分类，格式仍为 { items, total }，其中 total 等于 items.length。\n\n列表查询参数只接受文档列出的单值字段。请求体的未知字段视为参数错误。PATCH 省略的字段保持原值。\n\n商品参考单价用整数分。priceCents 为 null 时显示「价格面议」。品牌和型号未填写时返回空字符串，前台隐藏相应项。新增时可以省略，编辑时传空字符串可清空。已上架商品可以同时缺货。\n\n生产环境同源访问，后台使用 HttpOnly、Secure、SameSite=Lax、Path=/ 的 Cookie。后台写操作校验 Origin。开发环境可通过环境配置加入前端开发服务器的完整来源。跨端口直连时仅对配置的来源开放带凭据的 CORS，前端请求使用 credentials: include。仅本地 HTTP 开发可省略 Cookie 的 Secure 属性。\n\n登录成功后会话有效期为 30 天。每次需登录的后台接口成功返回时，从本次请求起重新计算 30 天有效期，同时续发 Cookie。会话到期或主动退出后需重新登录。会话和后台数据禁止缓存。\n\n公开商品目录应重新验证或禁用缓存，使上下架、缺货和删除变更及时生效。图片以同源根路径公开静态访问，使用不可猜测的随机文件名，可长期缓存。替换图片时使用新路径，源站清理图片后客户端可能仍持有旧缓存。\n\nINVALID_REQUEST 可以附带 fieldErrors。键为字段路径，如 name 或 detailImageIds.0，数组下标从 0 开始。值为简体中文提示。无法定位字段时使用 message。"
   },
   "paths": {
     "/api/shop": {
@@ -412,7 +412,7 @@
           "公开目录"
         ],
         "summary": "查看分类",
-        "description": "一次返回所有至少关联一件上架商品的分类。已上架的缺货商品计入。按 sortOrder 升序，再按 createdAt 升序排列。排序值和创建时间均相同时按 id 升序稳定排列。",
+        "description": "一次返回所有至少关联一件上架商品的分类。已上架的缺货商品计入。按 sortOrder 升序，再按 createdAt 升序排列。排序值和创建时间均相同时按 id 升序稳定排列。 iconUrl 返回方形缩略图。未设置或图片不可用时返回 null，商城使用内置图标。",
         "security": [],
         "responses": {
           "200": {
@@ -450,6 +450,18 @@
                             "format": "date-time",
                             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
                             "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                          },
+                          "iconUrl": {
+                            "description": "同源方形缩略图路径。未设置或已不可用时返回 null，旧版后端可能省略。两种情况均使用内置图标。",
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -1470,7 +1482,7 @@
           "后台分类"
         ],
         "summary": "查看后台分类列表",
-        "description": "一次返回所有分类，包含没有上架商品的分类。按 sortOrder 升序，再按 createdAt 升序排列。排序值和创建时间均相同时按 id 升序稳定排列。",
+        "description": "一次返回所有分类，包含没有上架商品的分类。按 sortOrder 升序，再按 createdAt 升序排列。排序值和创建时间均相同时按 id 升序稳定排列。 iconUrl 可用来预览已保存的图标，未设置或图片不可用时为 null。",
         "security": [
           {
             "adminSession": []
@@ -1512,6 +1524,18 @@
                             "format": "date-time",
                             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
                             "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                          },
+                          "iconUrl": {
+                            "description": "同源方形缩略图路径。未设置或已不可用时返回 null，旧版后端可能省略。两种情况均使用内置图标。",
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -1648,7 +1672,7 @@
           "后台分类"
         ],
         "summary": "新增分类",
-        "description": "分类名去除首尾空白后精确判重。",
+        "description": "分类名去除首尾空白后精确判重。 可省略 iconImageId 或传 null，表示不设置图标。iconImageId 使用上传接口返回的 ID。服务端校验关联图片可用且宽高相等。图片不存在或上传已失效时返回 IMAGE_NOT_FOUND。图片可用但不是方形时返回 INVALID_REQUEST，fieldErrors.iconImageId 为中文提示。",
         "security": [
           {
             "adminSession": []
@@ -1685,6 +1709,18 @@
                       "format": "date-time",
                       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
                       "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                    },
+                    "iconUrl": {
+                      "description": "同源方形缩略图路径。未设置或已不可用时返回 null，旧版后端可能省略。两种情况均使用内置图标。",
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -1769,6 +1805,37 @@
                     "value": {
                       "code": "UNAUTHENTICATED",
                       "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "图片不存在或上传已失效，请重新上传。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "IMAGE_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "IMAGE_NOT_FOUND": {
+                    "value": {
+                      "code": "IMAGE_NOT_FOUND",
+                      "message": "图片不存在或上传已失效，请重新上传。"
                     }
                   }
                 }
@@ -1869,6 +1936,20 @@
                     "minimum": 0,
                     "maximum": 9999,
                     "description": "显示顺序，数字越小越靠前。"
+                  },
+                  "iconImageId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                        "description": "服务端分配的 UUID，客户端按字符串使用。"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "上传接口返回的方形图标 ID。传 null 清除，PATCH 省略时保持原值。"
                   }
                 },
                 "required": [
@@ -1887,7 +1968,8 @@
         "tags": [
           "后台分类"
         ],
-        "summary": "改名或调整分类排序",
+        "summary": "修改分类名称、排序或图标",
+        "description": "PATCH 省略 iconImageId 时保留旧图标，传 null 清除，传新 ID 替换。iconImageId 使用上传接口返回的 ID。服务端校验关联图片可用且宽高相等。图片不存在或上传已失效时返回 IMAGE_NOT_FOUND。图片可用但不是方形时返回 INVALID_REQUEST，fieldErrors.iconImageId 为中文提示。图片只有在商品、分类图标和轮播图都不再引用时才可清理。",
         "security": [
           {
             "adminSession": []
@@ -1924,6 +2006,18 @@
                       "format": "date-time",
                       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
                       "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                    },
+                    "iconUrl": {
+                      "description": "同源方形缩略图路径。未设置或已不可用时返回 null，旧版后端可能省略。两种情况均使用内置图标。",
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -2015,7 +2109,7 @@
             }
           },
           "404": {
-            "description": "找不到该分类。",
+            "description": "找不到该分类。 图片不存在或上传已失效，请重新上传。",
             "content": {
               "application/json": {
                 "schema": {
@@ -2027,7 +2121,8 @@
                       "properties": {
                         "code": {
                           "enum": [
-                            "CATEGORY_NOT_FOUND"
+                            "CATEGORY_NOT_FOUND",
+                            "IMAGE_NOT_FOUND"
                           ]
                         }
                       }
@@ -2039,6 +2134,12 @@
                     "value": {
                       "code": "CATEGORY_NOT_FOUND",
                       "message": "找不到该分类。"
+                    }
+                  },
+                  "IMAGE_NOT_FOUND": {
+                    "value": {
+                      "code": "IMAGE_NOT_FOUND",
+                      "message": "图片不存在或上传已失效，请重新上传。"
                     }
                   }
                 }
@@ -2150,6 +2251,20 @@
                     "minimum": 0,
                     "maximum": 9999,
                     "description": "显示顺序，数字越小越靠前。"
+                  },
+                  "iconImageId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                        "description": "服务端分配的 UUID，客户端按字符串使用。"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "上传接口返回的方形图标 ID。传 null 清除，PATCH 省略时保持原值。"
                   }
                 },
                 "additionalProperties": false,
@@ -2165,7 +2280,7 @@
           "后台分类"
         ],
         "summary": "删除空分类",
-        "description": "有商品关联时返回 CATEGORY_IN_USE，关联的下架商品也计入。",
+        "description": "有商品关联时返回 CATEGORY_IN_USE，关联的下架商品也计入。 有轮播图关联时返回 CATEGORY_HAS_BANNERS，隐藏中的轮播图也计入。两种引用同时存在时优先返回 CATEGORY_IN_USE。删除成功后解除图标引用。图片只有在商品、分类图标和轮播图都不再引用时才可清理。",
         "security": [
           {
             "adminSession": []
@@ -2284,7 +2399,7 @@
             }
           },
           "409": {
-            "description": "该分类下还有商品，请先将商品移到其他分类。",
+            "description": "该分类下还有商品，请先将商品移到其他分类。 轮播图仍指向该分类，请先更换轮播图的分类或删除对应轮播图。",
             "content": {
               "application/json": {
                 "schema": {
@@ -2296,7 +2411,8 @@
                       "properties": {
                         "code": {
                           "enum": [
-                            "CATEGORY_IN_USE"
+                            "CATEGORY_IN_USE",
+                            "CATEGORY_HAS_BANNERS"
                           ]
                         }
                       }
@@ -2308,6 +2424,12 @@
                     "value": {
                       "code": "CATEGORY_IN_USE",
                       "message": "该分类下还有商品，请先将商品移到其他分类。"
+                    }
+                  },
+                  "CATEGORY_HAS_BANNERS": {
+                    "value": {
+                      "code": "CATEGORY_HAS_BANNERS",
+                      "message": "轮播图仍指向该分类，请先更换轮播图的分类或删除对应轮播图。"
                     }
                   }
                 }
@@ -3562,7 +3684,7 @@
           "后台商品"
         ],
         "summary": "编辑商品、变更上架及缺货状态、维护图片",
-        "description": "合并修改后校验完整商品。上架必须有主图，主图和详情图不得重复。将图片 ID 从 detailImageIds 移除即可解除详情图关联。主图可以替换，或在商品下架时通过 mainImageId=null 清空。移除的图片在没有商品引用时由服务端清理。",
+        "description": "合并修改后校验完整商品。上架必须有主图，主图和详情图不得重复。将图片 ID 从 detailImageIds 移除即可解除详情图关联。主图可以替换，或在商品下架时通过 mainImageId=null 清空。图片只有在商品、分类图标和轮播图都不再引用时才可清理。",
         "security": [
           {
             "adminSession": []
@@ -4213,8 +4335,8 @@
         "tags": [
           "图片"
         ],
-        "summary": "上传单张商品图片",
-        "description": "用 FormData 的 file 字段上传。服务端检查实际格式、文件大小和解码像素数（最多 2400 万），仅接受静态 JPEG、PNG 或 WebP。手机 HEIC 由前端转为 JPEG 并压缩后上传。重新编码生成压缩图（长边最多 1600 像素）和缩略图（长边最多 480 像素），不保存原图。上传后用返回的 id 保存商品，24 小时未关联的图片可被清理。Nginx 的请求体限制需容纳 10 MiB 文件和 multipart 封装开销，例如在上传路径设 client_max_body_size 11m。",
+        "summary": "上传单张图片",
+        "description": "用 FormData 的 file 字段上传。服务端检查实际格式、文件大小和解码像素数（最多 2400 万），仅接受静态 JPEG、PNG 或 WebP。手机 HEIC 由前端转为 JPEG 并压缩后上传。重新编码生成压缩图（长边最多 1600 像素）和缩略图（长边最多 480 像素），不保存原图。 可用返回的 id 关联商品、分类图标或轮播背景。上传后 24 小时未关联的图片可被清理。Nginx 的请求体限制需容纳 10 MiB 文件和 multipart 封装开销，例如在上传路径设 client_max_body_size 11m。 分类图标建议裁成 480 × 480 像素方图后上传。轮播背景建议 1600 × 800 像素，比例约 2:1，重要内容留在中间。服务端保留原比例，商城和后台预览按容器居中裁剪铺满，标题和按钮由页面叠放在图片上。",
         "security": [
           {
             "adminSession": []
@@ -4419,6 +4541,1263 @@
           }
         }
       }
+    },
+    "/api/banners": {
+      "get": {
+        "operationId": "listBanners",
+        "tags": [
+          "公开目录"
+        ],
+        "summary": "查看首页轮播图",
+        "description": "不分页。只返回 isVisible 为 true、背景图可用、目标分类存在且至少有一件上架商品的轮播图。已上架的缺货商品也计入。点击按 categoryId 进入商品列表。按 sortOrder 升序、createdAt 升序、id 升序排列。 无可展示图片时返回空列表，首页继续使用内置示例图。响应禁止缓存。",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "maxItems": 5,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          },
+                          "title": {
+                            "type": "string",
+                            "maxLength": 24,
+                            "pattern": "^[^\\r\\n]*$",
+                            "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 60,
+                            "pattern": "^[^\\r\\n]*$",
+                            "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                          },
+                          "buttonText": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 12,
+                            "pattern": "^[^\\r\\n]*$",
+                            "description": "纯文本按钮文字，1 至 12 个字符。"
+                          },
+                          "categoryId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "点击后进入的商品分类 ID。"
+                          },
+                          "backgroundImageUrl": {
+                            "type": "string",
+                            "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$",
+                            "description": "同源压缩图路径。"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "description",
+                          "buttonText",
+                          "categoryId",
+                          "backgroundImageUrl"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "匹配条件的总条数。"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/banners": {
+      "get": {
+        "operationId": "listAdminBanners",
+        "tags": [
+          "后台轮播图"
+        ],
+        "summary": "查看后台轮播图",
+        "description": "不分页，显示和隐藏的轮播图均返回。按 sortOrder 升序、createdAt 升序、id 升序排列。 isVisible 表示已保存的显示开关。目标分类无上架商品时仍保留设置。若背景文件已不可用，backgroundImageUrl 为 null，可换图或删除该记录。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "maxItems": 5,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "服务端分配的 UUID，客户端按字符串使用。"
+                          },
+                          "title": {
+                            "type": "string",
+                            "maxLength": 24,
+                            "pattern": "^[^\\r\\n]*$",
+                            "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 60,
+                            "pattern": "^[^\\r\\n]*$",
+                            "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                          },
+                          "buttonText": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 12,
+                            "pattern": "^[^\\r\\n]*$",
+                            "description": "纯文本按钮文字，1 至 12 个字符。"
+                          },
+                          "categoryId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "点击后进入的商品分类 ID。"
+                          },
+                          "backgroundImageUrl": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "同源压缩图路径，图片文件不可用时为 null。"
+                          },
+                          "backgroundImageId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                            "description": "图片上传接口返回的背景图 ID。"
+                          },
+                          "isVisible": {
+                            "type": "boolean",
+                            "description": "管理员设置的显示开关。"
+                          },
+                          "sortOrder": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9999,
+                            "description": "显示顺序，数字越小越靠前。"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "description",
+                          "buttonText",
+                          "categoryId",
+                          "backgroundImageUrl",
+                          "backgroundImageId",
+                          "isVisible",
+                          "sortOrder",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "匹配条件的总条数。"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createBanner",
+        "tags": [
+          "后台轮播图"
+        ],
+        "summary": "新增轮播图",
+        "description": "必须提供可用背景图的 backgroundImageId 和已存在的 categoryId。title 最多 24 字符，description 最多 60 字符，均可留空。buttonText 为 1 至 12 字符，默认为「去看看」。三项均为单行纯文本并去除首尾空白。默认隐藏，sortOrder 默认为 0。最多保存 5 张，隐藏图也计入。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "title": {
+                      "type": "string",
+                      "maxLength": 24,
+                      "pattern": "^[^\\r\\n]*$",
+                      "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 60,
+                      "pattern": "^[^\\r\\n]*$",
+                      "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                    },
+                    "buttonText": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 12,
+                      "pattern": "^[^\\r\\n]*$",
+                      "description": "纯文本按钮文字，1 至 12 个字符。"
+                    },
+                    "categoryId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "点击后进入的商品分类 ID。"
+                    },
+                    "backgroundImageUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "同源压缩图路径，图片文件不可用时为 null。"
+                    },
+                    "backgroundImageId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "图片上传接口返回的背景图 ID。"
+                    },
+                    "isVisible": {
+                      "type": "boolean",
+                      "description": "管理员设置的显示开关。"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9999,
+                      "description": "显示顺序，数字越小越靠前。"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "description",
+                    "buttonText",
+                    "categoryId",
+                    "backgroundImageUrl",
+                    "backgroundImageId",
+                    "isVisible",
+                    "sortOrder",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到该分类。 图片不存在或上传已失效，请重新上传。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "CATEGORY_NOT_FOUND",
+                            "IMAGE_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "CATEGORY_NOT_FOUND": {
+                    "value": {
+                      "code": "CATEGORY_NOT_FOUND",
+                      "message": "找不到该分类。"
+                    }
+                  },
+                  "IMAGE_NOT_FOUND": {
+                    "value": {
+                      "code": "IMAGE_NOT_FOUND",
+                      "message": "图片不存在或上传已失效，请重新上传。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "最多可设置 5 张轮播图，请先删除一张。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "BANNER_LIMIT_REACHED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "BANNER_LIMIT_REACHED": {
+                    "value": {
+                      "code": "BANNER_LIMIT_REACHED",
+                      "message": "最多可设置 5 张轮播图，请先删除一张。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 24,
+                    "pattern": "^[^\\r\\n]*$",
+                    "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                  },
+                  "description": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 60,
+                    "pattern": "^[^\\r\\n]*$",
+                    "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                  },
+                  "buttonText": {
+                    "default": "去看看",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 12,
+                    "pattern": "^[^\\r\\n]*$",
+                    "description": "纯文本按钮文字，1 至 12 个字符。"
+                  },
+                  "categoryId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                    "description": "点击后进入的商品分类 ID。"
+                  },
+                  "backgroundImageId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                    "description": "图片上传接口返回的背景图 ID。"
+                  },
+                  "isVisible": {
+                    "default": false,
+                    "type": "boolean",
+                    "description": "管理员设置的显示开关。"
+                  },
+                  "sortOrder": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9999,
+                    "description": "显示顺序，数字越小越靠前。"
+                  }
+                },
+                "required": [
+                  "categoryId",
+                  "backgroundImageId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/banners/{id}": {
+      "patch": {
+        "operationId": "updateBanner",
+        "tags": [
+          "后台轮播图"
+        ],
+        "summary": "修改轮播图及显示顺序",
+        "description": "至少提交一个字段，省略项保留。可只传 sortOrder 调整顺序，范围为 0 至 9999。按 sortOrder 升序、createdAt 升序、id 升序排列。 更换目标分类时须存在，更换图片或设置 isVisible=true 时须有可用背景图。已损坏的图片可换图或关闭显示。图片只有在商品、分类图标和轮播图都不再引用时才可清理。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "服务端分配的 UUID，客户端按字符串使用。"
+                    },
+                    "title": {
+                      "type": "string",
+                      "maxLength": 24,
+                      "pattern": "^[^\\r\\n]*$",
+                      "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 60,
+                      "pattern": "^[^\\r\\n]*$",
+                      "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                    },
+                    "buttonText": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 12,
+                      "pattern": "^[^\\r\\n]*$",
+                      "description": "纯文本按钮文字，1 至 12 个字符。"
+                    },
+                    "categoryId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "点击后进入的商品分类 ID。"
+                    },
+                    "backgroundImageUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^\\/uploads\\/(?:[A-Za-z0-9_-]+\\/)*[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "同源压缩图路径，图片文件不可用时为 null。"
+                    },
+                    "backgroundImageId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                      "description": "图片上传接口返回的背景图 ID。"
+                    },
+                    "isVisible": {
+                      "type": "boolean",
+                      "description": "管理员设置的显示开关。"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9999,
+                      "description": "显示顺序，数字越小越靠前。"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "description": "服务端记录的创建时间，ISO 8601 UTC 格式。"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "description",
+                    "buttonText",
+                    "categoryId",
+                    "backgroundImageUrl",
+                    "backgroundImageId",
+                    "isVisible",
+                    "sortOrder",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到该轮播图。 找不到该分类。 图片不存在或上传已失效，请重新上传。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "BANNER_NOT_FOUND",
+                            "CATEGORY_NOT_FOUND",
+                            "IMAGE_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "BANNER_NOT_FOUND": {
+                    "value": {
+                      "code": "BANNER_NOT_FOUND",
+                      "message": "找不到该轮播图。"
+                    }
+                  },
+                  "CATEGORY_NOT_FOUND": {
+                    "value": {
+                      "code": "CATEGORY_NOT_FOUND",
+                      "message": "找不到该分类。"
+                    }
+                  },
+                  "IMAGE_NOT_FOUND": {
+                    "value": {
+                      "code": "IMAGE_NOT_FOUND",
+                      "message": "图片不存在或上传已失效，请重新上传。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "服务端分配的 UUID，客户端按字符串使用。",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "description": "服务端分配的 UUID，客户端按字符串使用。"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 24,
+                    "pattern": "^[^\\r\\n]*$",
+                    "description": "最多 24 个字符，可为空。手机端可自动排两行。"
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "pattern": "^[^\\r\\n]*$",
+                    "description": "一句纯文本说明，最多 60 个字符，可为空。"
+                  },
+                  "buttonText": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 12,
+                    "pattern": "^[^\\r\\n]*$",
+                    "description": "纯文本按钮文字，1 至 12 个字符。"
+                  },
+                  "categoryId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                    "description": "点击后进入的商品分类 ID。"
+                  },
+                  "backgroundImageId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                    "description": "图片上传接口返回的背景图 ID。"
+                  },
+                  "isVisible": {
+                    "type": "boolean",
+                    "description": "管理员设置的显示开关。"
+                  },
+                  "sortOrder": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9999,
+                    "description": "显示顺序，数字越小越靠前。"
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 1
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteBanner",
+        "tags": [
+          "后台轮播图"
+        ],
+        "summary": "删除轮播图",
+        "description": "永久删除该轮播图并解除背景图片引用。图片只有在商品、分类图标和轮播图都不再引用时才可清理。",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "操作成功，无响应体。",
+            "headers": {
+              "Set-Cookie": {
+                "description": "续发管理员会话 Cookie，新的有效期为 30 天。",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请检查填写的内容后重试。 请从店铺后台页面操作。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INVALID_REQUEST",
+                            "INVALID_ORIGIN"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INVALID_REQUEST": {
+                    "value": {
+                      "code": "INVALID_REQUEST",
+                      "message": "请检查填写的内容后重试。"
+                    }
+                  },
+                  "INVALID_ORIGIN": {
+                    "value": {
+                      "code": "INVALID_ORIGIN",
+                      "message": "请从店铺后台页面操作。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请先登录。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "UNAUTHENTICATED"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "请先登录。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到该轮播图。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "BANNER_NOT_FOUND"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "BANNER_NOT_FOUND": {
+                    "value": {
+                      "code": "BANNER_NOT_FOUND",
+                      "message": "找不到该轮播图。"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务暂时不可用，请稍后再试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiError"
+                    },
+                    {
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            "INTERNAL_ERROR"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "INTERNAL_ERROR": {
+                    "value": {
+                      "code": "INTERNAL_ERROR",
+                      "message": "服务暂时不可用，请稍后再试。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "服务端分配的 UUID，客户端按字符串使用。",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "description": "服务端分配的 UUID，客户端按字符串使用。"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^https?:\\/\\/[^/?#@\\s]+$",
+              "description": "浏览器自动发送的 Origin，必须精确匹配服务端配置的允许来源，包括协议、主机和端口。"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -4476,9 +5855,12 @@
                   "INVALID_CREDENTIALS",
                   "CATEGORY_NOT_FOUND",
                   "PRODUCT_NOT_FOUND",
+                  "BANNER_NOT_FOUND",
                   "IMAGE_NOT_FOUND",
                   "CATEGORY_NAME_EXISTS",
                   "CATEGORY_IN_USE",
+                  "CATEGORY_HAS_BANNERS",
+                  "BANNER_LIMIT_REACHED",
                   "TOO_MANY_REQUESTS",
                   "INTERNAL_ERROR"
                 ]

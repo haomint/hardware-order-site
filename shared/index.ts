@@ -13,6 +13,7 @@ export {
 export {
   stageA,
   stageAInfo,
+  storefrontMedia,
   apiErrors,
   ApiErrorSchema,
   AdminSessionCookieName,
