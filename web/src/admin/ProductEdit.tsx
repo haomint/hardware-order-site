@@ -323,7 +323,7 @@ function Editor({ productId, categories, initial }: { productId?: string; catego
           <BackIcon />
           返回
         </button>
-        <h1 className="text-lg font-bold text-ink">{productId ? "编辑商品" : "新增商品"}</h1>
+        <h1 className="headline text-[22px] font-semibold text-ink">{productId ? "编辑商品" : "新增商品"}</h1>
       </div>
 
       <div className="space-y-4">
@@ -417,8 +417,8 @@ function Editor({ productId, categories, initial }: { productId?: string; catego
                   aria-invalid={Boolean(errors.categoryId) || undefined}
                   value={form.categoryId}
                   onChange={(e) => set("categoryId", e.target.value)}
-                  className={`h-12 w-full rounded-control border bg-surface px-3 text-base focus:outline-none ${
-                    errors.categoryId ? "border-red-400 focus:border-red-600" : "border-line focus:border-brand"
+                  className={`h-12 w-full rounded-xl border bg-page px-3.5 text-base focus:outline-none ${
+                    errors.categoryId ? "border-red-400 focus:border-red-600" : "border-transparent focus:border-brand"
                   } ${form.categoryId === "" ? "text-faint" : "text-ink"}`}
                 >
                   <option value="" disabled>
@@ -452,7 +452,7 @@ function Editor({ productId, categories, initial }: { productId?: string; catego
                     setErrors((previous) => ({ ...previous, priceText: undefined }));
                   }}
                   className={`min-h-tap rounded-control border text-base font-medium ${
-                    form.negotiable === option.value ? "border-brand bg-brand-soft text-brand" : "border-line text-ink"
+                    form.negotiable === option.value ? "border-brand bg-brand-soft text-brand" : "border-transparent bg-page text-ink active:opacity-70"
                   }`}
                 >
                   {option.label}
@@ -565,7 +565,7 @@ function Editor({ productId, categories, initial }: { productId?: string; catego
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface shadow-bar">
+      <div className="glass fixed inset-x-0 bottom-0 z-30 shadow-bar">
         <div className="pb-safe mx-auto max-w-shell">
           <div className="flex gap-3 px-4 py-3">
             <Button variant="outline" onClick={goBack} className="h-12 w-28 shrink-0">
@@ -610,7 +610,7 @@ function ImageTile({
 }) {
   return (
     <div className={`relative shrink-0 ${large ? "h-28 w-28" : "ratio-square"}`}>
-      <img src={image.thumbnailUrl} alt="" className="h-full w-full rounded-md border border-line bg-white object-contain" />
+      <img src={image.thumbnailUrl} alt="" className="h-full w-full rounded-lg bg-page object-contain" />
       <button
         type="button"
         onClick={onRemove}

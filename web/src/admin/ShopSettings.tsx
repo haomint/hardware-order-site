@@ -93,7 +93,7 @@ function ShopForm({ initial }: { initial: Shop }) {
   return (
     <form onSubmit={submit} noValidate className="space-y-3 pb-6">
       <div>
-        <h1 className="text-lg font-bold text-ink">店铺资料</h1>
+        <h1 className="headline text-[22px] font-semibold text-ink">店铺资料</h1>
         <p className="mt-0.5 text-[14px] text-muted">显示在商城首页、「联系店铺」弹窗和下单成功页，保存后马上生效。</p>
       </div>
 

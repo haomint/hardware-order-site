@@ -106,7 +106,7 @@ export function Orders() {
             onChange={(event) => setDraft(event.target.value)}
             placeholder="订单号或手机号"
             maxLength={32}
-            className="h-12 w-full appearance-none rounded-control border border-line bg-surface pl-10 pr-10 text-base placeholder:text-faint focus:border-brand focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="h-12 w-full appearance-none rounded-xl border border-transparent bg-surface pl-10 pr-10 text-base placeholder:text-faint focus:border-brand focus:outline-none [&::-webkit-search-cancel-button]:hidden"
           />
           {draft !== "" && (
             <button
@@ -125,7 +125,7 @@ export function Orders() {
         <button
           type="button"
           onClick={() => setRefreshKey((n) => n + 1)}
-          className="flex h-12 shrink-0 items-center rounded-control border border-line bg-surface px-4 text-[15px] font-medium text-brand active:bg-brand-soft"
+          className="flex h-12 shrink-0 items-center rounded-xl bg-surface px-4 text-[15px] font-medium text-brand active:opacity-70"
         >
           刷新
         </button>
@@ -142,8 +142,8 @@ export function Orders() {
               filter === item.key
                 ? item.key === "unpaid_done"
                   ? "bg-amber-600 text-white"
-                  : "bg-brand text-white"
-                : "border border-line bg-surface text-ink"
+                  : "bg-ink text-white"
+                : "bg-surface text-ink active:opacity-70"
             }`}
           >
             {item.label}
@@ -184,7 +184,7 @@ export function Orders() {
                   setDraft("");
                   setParams(new URLSearchParams(), { replace: true });
                 }}
-                className="mt-2 min-h-tap rounded-control border border-line bg-surface px-4 text-base text-brand"
+                className="mt-2 min-h-tap rounded-xl bg-surface px-4 text-base text-brand"
               >
                 清除搜索和筛选
               </button>
@@ -205,7 +205,7 @@ export function Orders() {
                 type="button"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="mt-4 min-h-tap w-full rounded-control border border-line bg-surface text-base font-medium text-brand disabled:text-faint"
+                className="mt-4 min-h-tap w-full rounded-xl bg-surface text-base font-medium text-brand disabled:text-faint"
               >
                 {loadingMore ? "正在加载…" : "加载更多"}
               </button>
@@ -254,7 +254,7 @@ function OrderRow({ order }: { order: Summary }) {
             {unpaidDone ? "已完成但未收款" : PAYMENT[order.paymentStatus]}
           </span>
         </span>
-        <span className="tabular text-[15px] font-bold text-ink">
+        <span className="tabular text-[16px] font-semibold text-ink">
           <span className="mr-1 text-[12px] font-normal text-muted">{order.finalTotalCents === null ? "预估" : "确认"}</span>¥
           {formatYuan(amount)}
         </span>

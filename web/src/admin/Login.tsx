@@ -50,7 +50,7 @@ export function Login() {
   return (
     <div className="flex min-h-screen flex-col items-center bg-page px-4 pt-16">
       <div className="w-full max-w-sm">
-        <h1 className="text-center text-2xl font-bold text-ink">店铺后台</h1>
+        <h1 className="headline text-center text-[28px] font-semibold text-ink">店铺后台</h1>
         {shop?.name && <p className="mt-1 text-center text-base text-muted">{shop.name}</p>}
 
         <form onSubmit={submit} className="mt-8 space-y-4 rounded-card bg-surface p-5 shadow-card" noValidate>
