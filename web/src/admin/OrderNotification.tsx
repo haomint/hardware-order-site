@@ -137,7 +137,7 @@ export function OrderNotification({ order, onChange }: { order: OrderDetail; onC
     <section className="rounded-card border border-red-200 bg-red-50 px-4 py-3" aria-label="手机提醒" aria-live="polite">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[15px] font-bold text-red-800">手机提醒：发送失败</p>
+          <p className="text-[15px] font-semibold text-red-800">手机提醒：发送失败</p>
           <p className="mt-0.5 text-[13px] leading-relaxed text-red-900/80">
             这笔订单的提醒没有发到微信。订单本身已经保存好，不受影响。
             {time && <span className="block">最后一次尝试 {time}</span>}

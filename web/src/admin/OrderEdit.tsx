@@ -159,10 +159,10 @@ function Editor({
       <section className="rounded-card bg-surface p-4 shadow-card">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="tabular text-[19px] font-bold text-ink">{order.orderNo}</p>
+            <p className="tabular text-[20px] font-semibold text-ink">{order.orderNo}</p>
             <p className="mt-0.5 text-[13px] text-muted">下单时间 {formatTime(order.createdAt)}</p>
           </div>
-          <span className={`shrink-0 rounded-lg px-2.5 py-1 text-[15px] font-bold ${STATUS[order.status].className}`}>{STATUS[order.status].label}</span>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-[14px] font-semibold ${STATUS[order.status].className}`}>{STATUS[order.status].label}</span>
         </div>
         {unpaidDone && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[14px] font-medium text-amber-900">已完成但还未收款，收到款后请在下方改为「已收款」。</p>
@@ -183,7 +183,7 @@ function Editor({
               disabled={saving !== null}
               onClick={() => pickStatus(status)}
               className={`min-h-tap rounded-control border-2 text-[15px] font-semibold disabled:opacity-60 ${
-                order.status === status ? "border-brand bg-brand-soft text-brand" : "border-line text-ink active:bg-page"
+                order.status === status ? "border-brand bg-brand-soft text-brand" : "border-transparent bg-page text-ink active:opacity-70"
               }`}
             >
               {STATUS[status].label}
@@ -259,7 +259,7 @@ function Editor({
                   ? value === "paid"
                     ? "border-emerald-600 bg-emerald-50 text-emerald-700"
                     : "border-amber-500 bg-amber-50 text-amber-800"
-                  : "border-line text-ink active:bg-page"
+                  : "border-transparent bg-page text-ink active:opacity-70"
               }`}
             >
               {PAYMENT[value]}
@@ -312,14 +312,14 @@ function Editor({
           <Row label="手机号">
             <span className="flex flex-wrap items-center gap-2">
               <span className="tabular">{order.phone}</span>
-              <a href={`tel:${order.phone}`} className="bg-brand-gradient inline-flex min-h-tap items-center gap-1 rounded-full px-4 text-[14px] font-bold text-white">
+              <a href={`tel:${order.phone}`} className="inline-flex min-h-tap items-center gap-1 rounded-full bg-brand px-4 text-[14px] font-semibold text-white active:bg-brand-dark">
                 <PhoneIcon size={16} />
                 拨打
               </a>
               <button
                 type="button"
                 onClick={async () => toast((await copyText(order.phone)) ? "手机号已复制" : "复制失败，请长按手动复制")}
-                className="inline-flex min-h-tap items-center gap-1 rounded-full border border-line px-3 text-[14px] text-ink"
+                className="inline-flex min-h-tap items-center gap-1 rounded-full bg-page px-3 text-[14px] text-ink active:opacity-70"
               >
                 <CopyIcon size={15} />
                 复制
@@ -358,7 +358,7 @@ function Editor({
                   {item.unit}
                 </p>
               </div>
-              <span className={`tabular shrink-0 text-[15px] ${item.subtotalCents === null ? "font-semibold text-brand" : "font-bold text-ink"}`}>
+              <span className={`tabular shrink-0 text-[15px] ${item.subtotalCents === null ? "text-muted" : "font-semibold text-ink"}`}>
                 {item.subtotalCents === null ? "面议" : `¥${formatYuan(item.subtotalCents)}`}
               </span>
             </li>
@@ -366,7 +366,7 @@ function Editor({
         </ul>
         <div className="flex items-baseline justify-between border-t border-line pt-2.5">
           <span className="text-[14px] text-muted">预估商品金额</span>
-          <span className="tabular text-[18px] font-extrabold text-accent">¥{formatYuan(order.estimatedTotalCents)}</span>
+          <span className="tabular text-[18px] font-semibold text-ink">¥{formatYuan(order.estimatedTotalCents)}</span>
         </div>
       </Card>
 
@@ -431,7 +431,7 @@ function Editor({
 function Card({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return (
     <section className="rounded-card bg-surface p-4 shadow-card">
-      <h2 className="text-base font-bold text-ink">{title}</h2>
+      <h2 className="text-[17px] font-semibold text-ink">{title}</h2>
       {note && <p className="mb-3 mt-0.5 text-[12px] text-faint">{note}</p>}
       {!note && <div className="mb-3" />}
       {children}

@@ -3,6 +3,12 @@
 export type {
   Shop,
   ShopPatch,
+  Banner,
+  AdminBanner,
+  BannerCreate,
+  BannerPatch,
+  bannerTextLimits,
+  maxBanners,
   Category,
   ProductListItem,
   ProductDetail,
@@ -61,9 +67,12 @@ export type AdminProductQuery = ProductQuery & {
   isOutOfStock?: "true" | "false";
 };
 
-/** 对应契约的 CategoryCreateSchema / CategoryPatchSchema。 */
-export type CategoryInput = { name: string; sortOrder?: number };
-export type CategoryPatch = { name?: string; sortOrder?: number };
+/**
+ * 对应契约的 CategoryWithIconCreateSchema / CategoryWithIconPatchSchema（#87）。
+ * iconImageId：上传接口返回的方图 ID；null 清除图标；修改时省略表示不变。
+ */
+export type CategoryInput = { name: string; sortOrder?: number; iconImageId?: string | null };
+export type CategoryPatch = { name?: string; sortOrder?: number; iconImageId?: string | null };
 
 export type LoginInput = { username: string; password: string };
 

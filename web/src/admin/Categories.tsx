@@ -1,13 +1,18 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { api, ApiError } from "../api/index.ts";
 import type { Category } from "../api/index.ts";
 import { useAsync } from "../lib/useAsync.ts";
+import { ImageError, prepareSquareImage } from "../lib/image.ts";
+import { CategoryIcon } from "../components/Art.tsx";
 import { EmptyNotice, ErrorNotice, toast } from "../components/Feedback.tsx";
 import { Button, Card, ConfirmDialog, Field, TextInput } from "./ui.tsx";
 
 function messageOf(error: unknown): string {
-  if (error instanceof ApiError) return error.fieldErrors?.name ?? error.fieldErrors?.sortOrder ?? error.message;
+  if (error instanceof ApiError) {
+    const fe = error.fieldErrors;
+    return fe?.name ?? fe?.sortOrder ?? fe?.iconImageId ?? error.message;
+  }
   return "操作失败，请重试。";
 }
 
@@ -126,7 +131,7 @@ export function Categories() {
           <>
             确定删除「{deleting?.name}」吗？
             <br />
-            分类下还有商品时无法删除，需要先把商品改到其他分类。
+            分类下还有商品，或有轮播图指向它时无法删除，需要先改到其他分类。
           </>
         }
         confirmText="删除"
@@ -144,6 +149,40 @@ function CategoryRow({ category, onSaved, onDelete }: { category: Category; onSa
   const [sort, setSort] = useState(String(category.sortOrder));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // 图标：undefined 表示不改；null 表示恢复内置图标；{ id, url } 表示换成刚上传的图
+  const [icon, setIcon] = useState<{ id: string; url: string } | null | undefined>(undefined);
+  const [uploading, setUploading] = useState(false);
+  const shownIcon = icon === undefined ? (category.iconUrl ?? null) : (icon?.url ?? null);
+
+  // 每次开始编辑、取消或换图都换一代：上传还没完成就点了「取消」，回来的结果属于旧一代，直接丢弃，
+  // 不会在下次打开编辑时冒出来，也不会被下一次保存带上。
+  const uploadGeneration = useRef(0);
+
+  const pickIcon = async (file: File | undefined) => {
+    if (!file) return;
+    const mine = ++uploadGeneration.current;
+    setUploading(true);
+    setError("");
+    try {
+      const square = await prepareSquareImage(file);
+      const uploaded = await api.uploadImage(square);
+      if (mine === uploadGeneration.current) setIcon({ id: uploaded.id, url: uploaded.thumbnailUrl });
+    } catch (caught) {
+      if (mine === uploadGeneration.current) setError(caught instanceof ImageError ? caught.message : messageOf(caught));
+    } finally {
+      if (mine === uploadGeneration.current) setUploading(false);
+    }
+  };
+
+  const cancel = () => {
+    uploadGeneration.current += 1;
+    setUploading(false);
+    setName(category.name);
+    setSort(String(category.sortOrder));
+    setIcon(undefined);
+    setError("");
+    setEditing(false);
+  };
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -151,16 +190,18 @@ function CategoryRow({ category, onSaved, onDelete }: { category: Category; onSa
     if (name.trim() === "") return setError("请填写分类名称。");
     if (sortOrder === null) return setError("排序请填 0 到 9999 的整数。");
 
-    const patch: { name?: string; sortOrder?: number } = {};
+    const patch: { name?: string; sortOrder?: number; iconImageId?: string | null } = {};
     if (name.trim() !== category.name) patch.name = name.trim();
     if (sortOrder !== category.sortOrder) patch.sortOrder = sortOrder;
-    if (Object.keys(patch).length === 0) return setEditing(false);
+    if (icon !== undefined && !(icon === null && !category.iconUrl)) patch.iconImageId = icon?.id ?? null;
+    if (Object.keys(patch).length === 0) return cancel();
 
     setBusy(true);
     setError("");
     try {
       await api.updateCategory(category.id, patch);
       toast("已保存");
+      setIcon(undefined);
       setEditing(false);
       await onSaved();
     } catch (caught) {
@@ -172,10 +213,11 @@ function CategoryRow({ category, onSaved, onDelete }: { category: Category; onSa
 
   if (!editing) {
     return (
-      <li className="flex items-center gap-2 py-2">
-        <span className="tabular w-10 shrink-0 text-sm text-faint" title="排序">
+      <li className="flex items-center gap-3 py-2">
+        <span className="tabular w-6 shrink-0 text-sm text-faint" title="排序">
           {category.sortOrder}
         </span>
+        <CategoryIcon name={category.name} iconUrl={category.iconUrl} size={44} />
         <span className="min-w-0 flex-1 break-words text-base text-ink">{category.name}</span>
         <Button variant="ghost" className="px-3" onClick={() => setEditing(true)}>
           修改
@@ -204,22 +246,39 @@ function CategoryRow({ category, onSaved, onDelete }: { category: Category; onSa
             </Field>
           </div>
         </div>
+        <div>
+          <p className="mb-1.5 text-[15px] text-ink">图标</p>
+          <div className="flex items-center gap-3">
+            <CategoryIcon name={category.name} iconUrl={shownIcon} size={64} />
+            <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+              <label className={`inline-flex min-h-tap cursor-pointer items-center rounded-xl bg-page px-4 text-base text-ink active:opacity-70 ${uploading || busy ? "pointer-events-none opacity-60" : ""}`}>
+                {uploading ? "正在上传…" : shownIcon ? "换一张" : "上传图标"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={uploading || busy}
+                  onChange={(event) => {
+                    void pickIcon(event.target.files?.[0]);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+              {shownIcon && (
+                <Button variant="ghost" className="px-2" disabled={uploading || busy} onClick={() => setIcon(null)}>
+                  用默认图标
+                </Button>
+              )}
+            </div>
+          </div>
+          <p className="mt-1.5 text-sm text-muted">会自动从图片中间裁成正方形。没有上传时使用内置图标。</p>
+        </div>
         {error && <p className="text-sm text-red-700">{error}</p>}
         <div className="flex gap-2">
-          <Button type="submit" disabled={busy} className="flex-1">
+          <Button type="submit" disabled={busy || uploading} className="flex-1">
             {busy ? "保存中…" : "保存"}
           </Button>
-          <Button
-            variant="outline"
-            className="flex-1"
-            disabled={busy}
-            onClick={() => {
-              setName(category.name);
-              setSort(String(category.sortOrder));
-              setError("");
-              setEditing(false);
-            }}
-          >
+          <Button variant="outline" className="flex-1" disabled={busy} onClick={cancel}>
             取消
           </Button>
         </div>

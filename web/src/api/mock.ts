@@ -38,6 +38,10 @@ import type {
   ProductQuery,
   Shop,
   ShopPatch,
+  Banner,
+  AdminBanner,
+  BannerCreate,
+  BannerPatch,
   UpdateProduct,
 } from "./types.ts";
 
@@ -353,6 +357,108 @@ function paginate<T>(rows: T[], query: ProductQuery): T[] {
 
 export function getShop(): Promise<Shop> {
   return delay(shop, 120);
+}
+
+// ── 首页轮播图（#70）：演示数据一开始没有轮播图，首页用内置示例图 ──
+
+type BannerRow = Omit<AdminBanner, "backgroundImageUrl">;
+let banners: BannerRow[] = [];
+const BANNER_LIMIT = 5;
+const BANNER_TEXT = { title: 16, description: 30, buttonText: 6 };
+
+const byBannerOrder = (a: BannerRow, b: BannerRow) =>
+  a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
+const toAdminBanner = (row: BannerRow): AdminBanner => ({ ...row, backgroundImageUrl: images.get(row.backgroundImageId)?.imageUrl ?? null });
+
+export function listBanners(): Promise<ListResult<Banner>> {
+  return respond(() => {
+    const published = new Set(products.filter((p) => p.isPublished).map((p) => p.categoryId));
+    const items = [...banners]
+      .sort(byBannerOrder)
+      .filter((b) => b.isVisible && images.has(b.backgroundImageId) && published.has(b.categoryId))
+      .map(({ id, title, description, buttonText, categoryId, backgroundImageId }) => ({
+        id, title, description, buttonText, categoryId, backgroundImageUrl: images.get(backgroundImageId)!.imageUrl,
+      }));
+    return { items, total: items.length };
+  }, 160);
+}
+
+export function listAdminBanners(): Promise<ListResult<AdminBanner>> {
+  return admin(() => {
+    const items = [...banners].sort(byBannerOrder).map(toAdminBanner);
+    return { items, total: items.length };
+  }, 160);
+}
+
+/** 按契约校验文字：单行、去首尾空白、长度上限；按钮文字不能为空。 */
+function bannerText(patch: BannerPatch, errors: Record<string, string>) {
+  const out: Partial<Pick<BannerRow, "title" | "description" | "buttonText">> = {};
+  const check = (key: "title" | "description" | "buttonText", label: string) => {
+    const raw = patch[key];
+    if (raw === undefined) return;
+    const value = raw.trim();
+    if (/[\r\n]/.test(value)) errors[key] = `${label}请填写为单行文字。`;
+    else if (value.length > BANNER_TEXT[key]) errors[key] = `${label}不能超过 ${BANNER_TEXT[key]} 个字。`;
+    else if (key === "buttonText" && !value) errors[key] = "请填写按钮文字。";
+    out[key] = value;
+  };
+  check("title", "轮播标题");
+  check("description", "轮播说明");
+  check("buttonText", "按钮文字");
+  return out;
+}
+
+export function createBanner(input: BannerCreate): Promise<AdminBanner> {
+  return admin(() => {
+    if (banners.length >= BANNER_LIMIT) fail(409, "BANNER_LIMIT_REACHED", `最多可设置 ${BANNER_LIMIT} 张轮播图，请先删除一张。`);
+    const errors: Record<string, string> = {};
+    const text = bannerText({ title: "", description: "", buttonText: "去看看", ...input }, errors);
+    if (Object.keys(errors).length) fail(400, "INVALID_REQUEST", "请检查填写的内容后重试。", errors);
+    if (!categories.some((c) => c.id === input.categoryId)) fail(404, "CATEGORY_NOT_FOUND", "找不到该分类。");
+    if (!images.has(input.backgroundImageId)) fail(404, "IMAGE_NOT_FOUND", "图片不存在或上传已失效，请重新上传。");
+    const row: BannerRow = {
+      id: newId(),
+      title: text.title ?? "",
+      description: text.description ?? "",
+      buttonText: text.buttonText ?? "去看看",
+      categoryId: input.categoryId,
+      backgroundImageId: input.backgroundImageId,
+      isVisible: input.isVisible ?? false,
+      sortOrder: input.sortOrder ?? 0,
+      createdAt: new Date().toISOString(),
+    };
+    banners = [...banners, row];
+    return toAdminBanner(row);
+  }, 300);
+}
+
+export function updateBanner(bannerId: string, patch: BannerPatch): Promise<AdminBanner> {
+  return admin(() => {
+    const current = banners.find((b) => b.id === bannerId);
+    if (!current) fail(404, "BANNER_NOT_FOUND", "找不到该轮播图。");
+    if (Object.keys(patch).length === 0) fail(400, "INVALID_REQUEST", "请至少填写一项修改内容。");
+    const errors: Record<string, string> = {};
+    const text = bannerText(patch, errors);
+    if (patch.sortOrder !== undefined && (!Number.isInteger(patch.sortOrder) || patch.sortOrder < 0 || patch.sortOrder > 9999)) {
+      errors.sortOrder = "排序值需为 0 到 9999 的整数。";
+    }
+    if (Object.keys(errors).length) fail(400, "INVALID_REQUEST", "请检查填写的内容后重试。", errors);
+    if (patch.categoryId !== undefined && !categories.some((c) => c.id === patch.categoryId)) fail(404, "CATEGORY_NOT_FOUND", "找不到该分类。");
+    const imageId = patch.backgroundImageId ?? current.backgroundImageId;
+    if ((patch.backgroundImageId !== undefined || patch.isVisible === true) && !images.has(imageId)) {
+      fail(404, "IMAGE_NOT_FOUND", "图片不存在或上传已失效，请重新上传。");
+    }
+    const updated: BannerRow = { ...current, ...patch, ...text };
+    banners = banners.map((b) => (b.id === bannerId ? updated : b));
+    return toAdminBanner(updated);
+  }, 260);
+}
+
+export function deleteBanner(bannerId: string): Promise<void> {
+  return admin(() => {
+    if (!banners.some((b) => b.id === bannerId)) fail(404, "BANNER_NOT_FOUND", "找不到该轮播图。");
+    banners = banners.filter((b) => b.id !== bannerId);
+  });
 }
 
 export function getAdminShop(): Promise<Shop> {
@@ -768,10 +874,18 @@ export function createCategory(input: CategoryInput): Promise<Category> {
       name,
       sortOrder: input.sortOrder ?? 0,
       createdAt: new Date().toISOString(),
+      iconUrl: input.iconImageId ? iconUrlOf(input.iconImageId) : null,
     };
     categories = [...categories, created];
     return created;
   });
+}
+
+/** 图标图片必须是已上传的图片；真实后端还会检查宽高相等，前端上传前已裁成方图。 */
+function iconUrlOf(imageId: string): string {
+  const image = images.get(imageId);
+  if (!image) fail(404, "IMAGE_NOT_FOUND", "图片不存在或上传已失效，请重新上传。");
+  return image.thumbnailUrl;
 }
 
 export function updateCategory(categoryId: string, patch: CategoryPatch): Promise<Category> {
@@ -779,7 +893,9 @@ export function updateCategory(categoryId: string, patch: CategoryPatch): Promis
     const current = findCategory(categoryId);
     const name = patch.name === undefined ? current.name : patch.name.trim();
     assertCategoryName(name, categoryId);
-    const updated = { ...current, name, sortOrder: patch.sortOrder ?? current.sortOrder };
+    const iconUrl =
+      patch.iconImageId === undefined ? (current.iconUrl ?? null) : patch.iconImageId === null ? null : iconUrlOf(patch.iconImageId);
+    const updated = { ...current, name, sortOrder: patch.sortOrder ?? current.sortOrder, iconUrl };
     categories = categories.map((c) => (c.id === categoryId ? updated : c));
     return updated;
   }, 180);
@@ -790,6 +906,9 @@ export function deleteCategory(categoryId: string): Promise<void> {
     findCategory(categoryId);
     if (products.some((p) => p.categoryId === categoryId)) {
       fail(409, "CATEGORY_IN_USE", "该分类下还有商品，请先将商品移到其他分类。");
+    }
+    if (banners.some((b) => b.categoryId === categoryId)) {
+      fail(409, "CATEGORY_HAS_BANNERS", "轮播图仍指向该分类，请先更换轮播图的分类或删除对应轮播图。");
     }
     categories = categories.filter((c) => c.id !== categoryId);
   });

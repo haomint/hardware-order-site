@@ -102,6 +102,12 @@ export function Home() {
   };
 
   const onBanner = (action: BannerAction) => {
+    if (action.kind === "categoryId") {
+      scrollAfterFilter(action.id !== categoryId || q !== "");
+      setDraft("");
+      setFilter({ c: action.id, q: "" });
+      return;
+    }
     if (action.kind === "category") {
       const match = categoryList.find((c) => action.match.test(c.name));
       if (match) {
@@ -229,7 +235,7 @@ export function Home() {
                       }}
                       className="flex w-full flex-col items-center gap-2 active:opacity-60"
                     >
-                      <CategoryIcon name={category.name} active={active} size={iconSize} />
+                      <CategoryIcon name={category.name} iconUrl={category.iconUrl} active={active} size={iconSize} />
                       <span className={`max-w-full truncate px-0.5 text-[13px] ${active ? "font-semibold text-brand" : "text-ink"}`}>
                         {category.name}
                       </span>

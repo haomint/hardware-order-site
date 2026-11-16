@@ -5,11 +5,12 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTML
 type ButtonVariant = "primary" | "accent" | "outline" | "danger" | "ghost";
 
 const buttonStyles: Record<ButtonVariant, string> = {
-  primary: "bg-brand text-white active:bg-brand-dark disabled:bg-faint",
-  accent: "bg-accent text-white active:bg-accent-dark disabled:bg-faint",
-  outline: "border border-line bg-surface text-ink active:bg-brand-soft disabled:text-faint",
-  danger: "border border-red-200 bg-surface text-red-700 active:bg-red-50 disabled:text-faint",
-  ghost: "text-brand active:bg-brand-soft disabled:text-faint",
+  // 苹果风格：主按钮蓝色纯色，次要按钮浅灰填充，危险操作浅红底红字，都不用描边
+  primary: "bg-brand font-semibold text-white active:bg-brand-dark disabled:bg-page disabled:text-faint",
+  accent: "bg-brand font-semibold text-white active:bg-brand-dark disabled:bg-page disabled:text-faint",
+  outline: "bg-page text-ink active:opacity-70 disabled:text-faint",
+  danger: "bg-red-50 text-red-600 active:bg-red-100 disabled:text-faint",
+  ghost: "text-brand active:opacity-60 disabled:text-faint",
 };
 
 export function Button({
@@ -20,7 +21,7 @@ export function Button({
   return (
     <button
       type="button"
-      className={`inline-flex min-h-tap items-center justify-center gap-1.5 rounded-control px-4 text-base font-medium ${buttonStyles[variant]} ${className}`}
+      className={`inline-flex min-h-tap items-center justify-center gap-1.5 rounded-xl px-4 text-base font-medium ${buttonStyles[variant]} ${className}`}
       {...rest}
     />
   );
@@ -45,7 +46,7 @@ export function Field({
   const hasMessage = Boolean(error || hint);
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[15px] font-medium text-ink">
+      <label htmlFor={id} className="mb-1.5 block text-[15px] text-ink">
         {label}
         {optional && <span className="ml-1 text-sm font-normal text-faint">（可不填）</span>}
       </label>
@@ -66,13 +67,13 @@ export function Field({
 }
 
 const inputBase =
-  "w-full rounded-control border bg-surface px-3 text-base text-ink placeholder:text-faint focus:outline-none disabled:bg-page disabled:text-faint";
+  "w-full rounded-xl border bg-page px-3.5 text-base text-ink placeholder:text-faint focus:bg-surface focus:outline-none disabled:text-faint";
 
 export function TextInput({ invalid, className = "", ...rest }: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
   return (
     <input
       aria-invalid={invalid || undefined}
-      className={`${inputBase} h-12 ${invalid ? "border-red-400 focus:border-red-600" : "border-line focus:border-brand"} ${className}`}
+      className={`${inputBase} h-12 ${invalid ? "border-red-400 focus:border-red-600" : "border-transparent focus:border-brand"} ${className}`}
       {...rest}
     />
   );
@@ -86,7 +87,7 @@ export function TextArea({
   return (
     <textarea
       aria-invalid={invalid || undefined}
-      className={`${inputBase} py-2.5 leading-relaxed ${invalid ? "border-red-400 focus:border-red-600" : "border-line focus:border-brand"} ${className}`}
+      className={`${inputBase} py-2.5 leading-relaxed ${invalid ? "border-red-400 focus:border-red-600" : "border-transparent focus:border-brand"} ${className}`}
       {...rest}
     />
   );
@@ -121,10 +122,10 @@ export function Switch({
       </span>
       <span
         aria-hidden="true"
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${checked ? "bg-brand" : "bg-line"}`}
+        className={`relative h-[30px] w-[50px] shrink-0 rounded-full transition-colors ${checked ? "bg-brand" : "bg-[#e9e9eb]"}`}
       >
         <span
-          className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-[22px]" : "translate-x-0.5"}`}
+          className={`absolute top-0.5 h-[26px] w-[26px] rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition-transform ${checked ? "translate-x-[22px]" : "translate-x-0.5"}`}
         />
       </span>
     </button>
@@ -134,7 +135,7 @@ export function Switch({
 export function Card({ title, children, className = "" }: { title?: string; children: ReactNode; className?: string }) {
   return (
     <section className={`rounded-card bg-surface p-4 shadow-card ${className}`}>
-      {title && <h2 className="mb-3 text-base font-bold text-ink">{title}</h2>}
+      {title && <h2 className="mb-3 text-[17px] font-semibold text-ink">{title}</h2>}
       {children}
     </section>
   );
@@ -174,10 +175,10 @@ export function ConfirmDialog({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
-        className="pb-safe w-full max-w-sm rounded-card bg-surface p-5 shadow-xl"
+        className="pb-safe w-full max-w-sm rounded-2xl bg-surface p-5 shadow-float"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 id="confirm-title" className="text-lg font-bold text-ink">
+        <h2 id="confirm-title" className="text-lg font-semibold text-ink">
           {title}
         </h2>
         <div className="mt-2 text-base text-muted">{message}</div>
@@ -189,7 +190,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="min-h-tap rounded-control bg-red-700 text-base font-medium text-white active:bg-red-800 disabled:bg-faint"
+            className="min-h-tap rounded-xl bg-red-600 text-base font-semibold text-white active:bg-red-700 disabled:bg-faint"
           >
             {busy ? "处理中…" : confirmText}
           </button>
