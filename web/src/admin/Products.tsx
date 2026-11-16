@@ -86,7 +86,7 @@ export function Products() {
             onChange={(event) => setDraft(event.target.value)}
             placeholder="搜索商品名、品牌或型号"
             maxLength={100}
-            className="h-12 w-full appearance-none rounded-control border border-line bg-surface pl-10 pr-10 text-base placeholder:text-faint focus:border-brand focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="h-12 w-full appearance-none rounded-xl border border-transparent bg-surface pl-10 pr-10 text-base placeholder:text-faint focus:border-brand focus:outline-none [&::-webkit-search-cancel-button]:hidden"
           />
           {draft !== "" && (
             <button
@@ -119,7 +119,7 @@ export function Products() {
             aria-pressed={status === filter.key}
             onClick={() => setFilter({ s: filter.key })}
             className={`min-h-[40px] shrink-0 rounded-full px-4 text-[15px] font-medium ${
-              status === filter.key ? "bg-brand text-white" : "border border-line bg-surface text-ink"
+              status === filter.key ? "bg-ink text-white" : "bg-surface text-ink active:opacity-70"
             }`}
           >
             {filter.label}
@@ -157,7 +157,7 @@ export function Products() {
                 type="button"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="mt-4 min-h-tap w-full rounded-control border border-line bg-surface text-base font-medium text-brand disabled:text-faint"
+                className="mt-4 min-h-tap w-full rounded-xl bg-surface text-base font-medium text-brand disabled:text-faint"
               >
                 {loadingMore ? "正在加载…" : "加载更多"}
               </button>
@@ -176,7 +176,7 @@ function ProductRow({ product, categoryName }: { product: AdminProduct; category
       to={`/admin/products/${product.id}`}
       className="flex gap-3 rounded-card bg-surface p-3 shadow-card active:opacity-80"
     >
-      <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-md border border-line bg-white">
+      <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-page">
         {product.mainImage ? (
           <img
             src={product.mainImage.thumbnailUrl}

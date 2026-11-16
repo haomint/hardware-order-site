@@ -128,7 +128,7 @@ function ExportSheet({ onClose }: { onClose: () => void }) {
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 id="export-title" className="text-lg font-bold text-ink">
+            <h2 id="export-title" className="text-lg font-semibold text-ink">
               导出订单表格
             </h2>
             <p className="mt-0.5 text-[13px] text-muted">按下单日期选择，包含客户、商品明细、金额和状态。</p>
@@ -147,7 +147,7 @@ function ExportSheet({ onClose }: { onClose: () => void }) {
               aria-checked={preset === item.key}
               onClick={() => pick(item.key)}
               className={`min-h-tap whitespace-nowrap rounded-control border-2 px-1 text-[15px] font-medium ${
-                preset === item.key ? "border-brand bg-brand-soft text-brand" : "border-line text-ink active:bg-page"
+                preset === item.key ? "border-brand bg-brand-soft text-brand" : "border-transparent bg-page text-ink active:opacity-70"
               }`}
             >
               {item.label}
@@ -198,7 +198,7 @@ function ExportSheet({ onClose }: { onClose: () => void }) {
             <p className="rounded-lg bg-page px-3 py-2 text-ink">这段时间没有订单，换个日期试试。</p>
           ) : (
             <p className="text-ink">
-              共 <span className="tabular font-bold">{count.total}</span> 笔订单
+              共 <span className="tabular font-semibold">{count.total}</span> 笔订单
             </p>
           )}
         </div>
