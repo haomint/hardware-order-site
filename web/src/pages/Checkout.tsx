@@ -207,16 +207,16 @@ export function Checkout() {
 
   return (
     <div className="mx-auto min-h-screen max-w-shell" style={{ paddingBottom: "calc(112px + var(--safe-bottom))" }}>
-      <header className="sticky top-0 z-30 flex h-12 items-center border-b border-line bg-surface/95 px-1">
+      <header className="glass sticky top-0 z-30 flex h-12 items-center px-1 [box-shadow:0_0.5px_0_rgba(0,0,0,0.12)]">
         <button
           type="button"
           onClick={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate("/cart"))}
-          className="flex min-h-tap items-center gap-0.5 pl-2 pr-3 text-base text-ink active:opacity-60"
+          className="flex min-h-tap items-center gap-0.5 pl-1 pr-3 text-[17px] text-brand active:opacity-60"
         >
           <BackIcon />
           购物车
         </button>
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-[17px] font-bold text-ink">提交订货单</h1>
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-[17px] font-semibold text-ink">提交订货单</h1>
       </header>
 
       {loadError ? (
@@ -224,7 +224,7 @@ export function Checkout() {
       ) : !items ? (
         <p className="py-16 text-center text-muted">正在核对商品…</p>
       ) : (
-        <form ref={formRef} onSubmit={submit} noValidate className="space-y-3 px-4 pt-3">
+        <form ref={formRef} onSubmit={submit} noValidate className="space-y-6 px-4 pt-5">
           {banner && (
             <p role="alert" className="rounded-card bg-amber-50 px-4 py-3 text-[15px] leading-relaxed text-amber-900">
               {banner}
@@ -239,25 +239,27 @@ export function Checkout() {
                 const subtotal = product && product.priceCents !== null ? product.priceCents * line.quantity : null;
                 const sub = product ? brandModel(product.brand, product.model) : "";
                 return (
-                  <li key={line.productId} className="flex items-center gap-3 py-2.5">
+                  <li key={line.productId} className="flex items-center gap-3 py-3">
                     {product && (
-                      <img src={product.mainImage.thumbnailUrl} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-line bg-white object-contain" />
+                      <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-page">
+                        <img src={product.mainImage.thumbnailUrl} alt="" className="h-full w-full object-contain p-1 mix-blend-multiply" />
+                      </span>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-[15px] leading-snug text-ink">{product?.name ?? line.name}</p>
+                      <p className="line-clamp-2 text-[16px] leading-snug text-ink">{product?.name ?? line.name}</p>
                       {sub && <p className="break-words text-[13px] leading-snug text-muted">{sub}</p>}
                       <p className="text-[13px] text-muted">
                         ×{line.quantity} {product?.unit ?? line.unit}
                       </p>
                     </div>
-                    <span className={`tabular shrink-0 text-[15px] ${subtotal === null ? "font-semibold text-brand" : "font-bold text-ink"}`}>
+                    <span className={`tabular shrink-0 text-[16px] ${subtotal === null ? "text-muted" : "font-semibold text-ink"}`}>
                       {subtotal === null ? "面议" : `¥${formatYuan(subtotal)}`}
                     </span>
                   </li>
                 );
               })}
             </ul>
-            <Link to="/cart" className="mt-1 inline-flex min-h-tap items-center text-[14px] text-brand">
+            <Link to="/cart" className="inline-flex min-h-tap items-center text-[15px] text-brand">
               修改商品或数量
             </Link>
           </Card>
@@ -294,7 +296,7 @@ export function Checkout() {
           </Card>
 
           <Card title="配送方式">
-            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="配送方式">
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-page p-1" role="radiogroup" aria-label="配送方式">
               {(
                 [
                   ["delivery", "送货上门"],
@@ -310,8 +312,8 @@ export function Checkout() {
                     setDelivery(value);
                     clearError("address");
                   }}
-                  className={`min-h-[48px] rounded-control border-2 text-[16px] font-semibold ${
-                    delivery === value ? "border-brand bg-brand-soft text-brand" : "border-line text-ink"
+                  className={`min-h-tap rounded-[10px] text-[16px] ${
+                    delivery === value ? "bg-surface font-semibold text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]" : "text-muted"
                   }`}
                 >
                   {label}
@@ -335,8 +337,8 @@ export function Checkout() {
                 />
               </div>
             ) : (
-              <p className="mt-3 flex items-start gap-2 rounded-lg bg-page px-3 py-2.5 text-[14px] text-muted">
-                <TruckIcon size={18} className="mt-0.5 shrink-0 text-brand" />
+              <p className="mt-3 flex items-start gap-2 px-1 text-[14px] text-muted">
+                <TruckIcon size={18} className="mt-0.5 shrink-0 text-faint" />
                 店家确认后会通知您到店取货，无需填写地址。
               </p>
             )}
@@ -367,21 +369,18 @@ export function Checkout() {
             使用以上信息联系您
           </p>
 
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-surface shadow-bar">
+          <div className="glass fixed inset-x-0 bottom-0 z-30 shadow-bar">
             <div className="pb-safe mx-auto max-w-shell">
-              <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <div className="flex items-center justify-between gap-3 px-5 py-3">
                 <div className="min-w-0">
                   <p className="text-[13px] text-muted">预估商品金额</p>
-                  <p className="tabular text-accent">
-                    <span className="text-[15px] font-bold">¥</span>
-                    <span className="text-[24px] font-extrabold leading-tight">{formatYuan(totalCents)}</span>
-                  </p>
+                  <p className="tabular headline text-[24px] font-semibold leading-tight text-ink">¥{formatYuan(totalCents)}</p>
                   <p className="text-[11px] leading-tight text-faint">{hasNegotiable ? "不含面议商品和运费" : "不含运费"}，以店家确认为准</p>
                 </div>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="bg-accent-gradient h-12 shrink-0 rounded-full px-6 text-[16px] font-bold text-white shadow-accent disabled:opacity-60"
+                  className="h-11 shrink-0 rounded-full bg-brand px-6 text-[16px] font-semibold text-white active:bg-brand-dark disabled:opacity-60"
                 >
                   {submitting ? "正在提交…" : "提交订货单"}
                 </button>
@@ -396,9 +395,9 @@ export function Checkout() {
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-card bg-surface p-4 shadow-card">
-      <h2 className="mb-3 text-[16px] font-bold text-ink">{title}</h2>
-      {children}
+    <section>
+      <h2 className="mb-2 px-4 text-[14px] text-muted">{title}</h2>
+      <div className="rounded-card bg-surface px-4 py-3">{children}</div>
     </section>
   );
 }
@@ -419,7 +418,7 @@ function Input({ label, value, onChange, error, ...rest }: InputProps) {
   const id = `f-${label}`;
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[15px] font-medium text-ink">
+      <label htmlFor={id} className="mb-1.5 block text-[15px] text-ink">
         {label}
       </label>
       <input
@@ -428,8 +427,8 @@ function Input({ label, value, onChange, error, ...rest }: InputProps) {
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-err` : undefined}
-        className={`h-12 w-full rounded-control border bg-surface px-3 text-base text-ink placeholder:text-faint focus:outline-none ${
-          error ? "border-red-400 focus:border-red-600" : "border-line focus:border-brand"
+        className={`h-12 w-full rounded-xl border bg-page px-3.5 text-base text-ink placeholder:text-faint focus:bg-surface focus:outline-none ${
+          error ? "border-red-400 focus:border-red-600" : "border-transparent focus:border-brand"
         }`}
         {...rest}
       />
@@ -464,7 +463,7 @@ function TextArea({
   const id = `f-${label}`;
   return (
     <div>
-      <label htmlFor={id} className={hideLabel ? "sr-only" : "mb-1.5 block text-[15px] font-medium text-ink"}>
+      <label htmlFor={id} className={hideLabel ? "sr-only" : "mb-1.5 block text-[15px] text-ink"}>
         {label}
       </label>
       <textarea
@@ -474,8 +473,8 @@ function TextArea({
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-err` : undefined}
         maxLength={maxLength}
-        className={`w-full rounded-control border bg-surface px-3 py-2.5 text-base leading-relaxed text-ink placeholder:text-faint focus:outline-none ${
-          error ? "border-red-400 focus:border-red-600" : "border-line focus:border-brand"
+        className={`w-full rounded-xl border bg-page px-3.5 py-2.5 text-base leading-relaxed text-ink placeholder:text-faint focus:bg-surface focus:outline-none ${
+          error ? "border-red-400 focus:border-red-600" : "border-transparent focus:border-brand"
         }`}
         {...rest}
       />

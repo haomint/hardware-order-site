@@ -4,6 +4,7 @@ import type { OrderReceipt } from "../api/index.ts";
 import { copyText } from "../lib/clipboard.ts";
 import { formatYuan, telHref } from "../lib/format.ts";
 import { useShop } from "../lib/shop.tsx";
+import { useWhitePage } from "../lib/useWhitePage.ts";
 import { toast } from "../components/Feedback.tsx";
 import { openContact } from "../components/ContactSheet.tsx";
 import { CopyIcon, PhoneIcon } from "../components/icons.tsx";
@@ -47,6 +48,7 @@ export function orderText(order: OrderSummary, shopName?: string): string {
 export function OrderSuccess() {
   const location = useLocation();
   const shop = useShop();
+  useWhitePage();
   const order = (location.state as OrderSummary | null) ?? readLastOrder();
 
   useEffect(() => {
@@ -61,33 +63,33 @@ export function OrderSuccess() {
   const copy = async (text: string, done: string) => toast((await copyText(text)) ? done : "复制失败，请长按文字手动复制");
 
   return (
-    <div className="mx-auto min-h-screen max-w-shell px-4 pb-10 pt-8">
+    <div className="mx-auto min-h-screen max-w-shell bg-surface px-5 pb-10 pt-10">
       <div className="text-center">
-        <span className="bg-brand-gradient mx-auto flex h-16 w-16 items-center justify-center rounded-full text-white shadow-brand">
+        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand text-white">
           <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="m5 12.5 4.5 4.5L19 7.5" />
           </svg>
         </span>
-        <h1 className="mt-4 text-[22px] font-extrabold text-ink">订货单已提交</h1>
+        <h1 className="headline mt-4 text-[28px] font-semibold text-ink">订货单已提交</h1>
       </div>
 
-      <div className="mt-5 rounded-card border border-amber-200 bg-amber-50 px-4 py-3.5" role="status">
-        <p className="text-[17px] font-bold text-amber-900">等待商家联系，未完成付款</p>
-        <p className="mt-1 text-[14px] leading-relaxed text-amber-900/80">
+      <div className="mt-6 rounded-card bg-page px-4 py-4" role="status">
+        <p className="text-[17px] font-semibold text-ink">等待商家联系，未完成付款</p>
+        <p className="mt-1 text-[15px] leading-relaxed text-muted">
           店家会尽快通过电话或微信联系您，确认价格、运费和{order.deliveryMethod === "pickup" ? "取货时间" : "送货时间"}。网站不收款，请勿向陌生账户转账。
         </p>
       </div>
 
-      <section className="mt-3 rounded-card bg-surface p-4 shadow-card">
+      <section className="mt-6">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[13px] text-muted">订单号</p>
-            <p className="tabular text-[20px] font-bold tracking-wide text-ink">{receipt.orderNo}</p>
+            <p className="tabular text-[20px] font-semibold tracking-wide text-ink">{receipt.orderNo}</p>
           </div>
           <button
             type="button"
             onClick={() => copy(receipt.orderNo, "订单号已复制")}
-            className="flex min-h-tap shrink-0 items-center gap-1 rounded-full border border-line px-3 text-[14px] text-ink active:bg-page"
+            className="flex min-h-tap shrink-0 items-center gap-1 px-1 text-[15px] text-brand active:opacity-60"
           >
             <CopyIcon size={16} />
             复制
@@ -103,7 +105,7 @@ export function OrderSuccess() {
                   {item.unit}
                 </span>
               </p>
-              <span className={`tabular shrink-0 text-[15px] ${item.subtotalCents === null ? "font-semibold text-brand" : "font-bold text-ink"}`}>
+              <span className={`tabular shrink-0 text-[15px] ${item.subtotalCents === null ? "text-muted" : "font-semibold text-ink"}`}>
                 {item.subtotalCents === null ? "面议" : `¥${formatYuan(item.subtotalCents)}`}
               </span>
             </li>
@@ -111,7 +113,7 @@ export function OrderSuccess() {
         </ul>
         <div className="flex items-baseline justify-between border-t border-line pt-3">
           <span className="text-[14px] text-muted">预估商品金额</span>
-          <span className="tabular text-[20px] font-extrabold text-accent">¥{formatYuan(receipt.estimatedTotalCents)}</span>
+          <span className="tabular headline text-[22px] font-semibold text-ink">¥{formatYuan(receipt.estimatedTotalCents)}</span>
         </div>
         <p className="mt-0.5 text-right text-[12px] text-faint">{hasNegotiable ? "不含面议商品和运费" : "不含运费"}，最终金额以商家确认为准</p>
       </section>
@@ -119,7 +121,7 @@ export function OrderSuccess() {
       <button
         type="button"
         onClick={() => copy(orderText(order, shop?.name), "订单内容已复制，可粘贴到微信发给店家")}
-        className="bg-accent-gradient mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full text-[17px] font-bold text-white shadow-accent"
+        className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand text-[17px] font-semibold text-white active:bg-brand-dark"
       >
         <CopyIcon size={19} />
         复制订单内容
@@ -128,16 +130,16 @@ export function OrderSuccess() {
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         {shop?.phone ? (
-          <a href={telHref(shop.phone)} className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-full border border-line bg-surface text-[15px] font-medium text-ink active:bg-page">
+          <a href={telHref(shop.phone)} className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-full bg-page text-[15px] font-medium text-ink active:opacity-70">
             <PhoneIcon size={18} />
             拨打店铺电话
           </a>
         ) : (
-          <button type="button" onClick={openContact} className="min-h-[48px] rounded-full border border-line bg-surface text-[15px] font-medium text-ink">
+          <button type="button" onClick={openContact} className="min-h-[48px] rounded-full bg-page text-[15px] font-medium text-ink active:opacity-70">
             联系店铺
           </button>
         )}
-        <Link to="/" replace className="flex min-h-[48px] items-center justify-center rounded-full border border-line bg-surface text-[15px] font-medium text-brand active:bg-page">
+        <Link to="/" replace className="flex min-h-[48px] items-center justify-center rounded-full bg-page text-[15px] font-medium text-brand active:opacity-70">
           继续选购
         </Link>
       </div>
