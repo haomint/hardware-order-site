@@ -102,6 +102,12 @@ export function Home() {
   };
 
   const onBanner = (action: BannerAction) => {
+    if (action.kind === "categoryId") {
+      scrollAfterFilter(action.id !== categoryId || q !== "");
+      setDraft("");
+      setFilter({ c: action.id, q: "" });
+      return;
+    }
     if (action.kind === "category") {
       const match = categoryList.find((c) => action.match.test(c.name));
       if (match) {

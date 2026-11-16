@@ -1,10 +1,16 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { api } from "../api/index.ts";
+import type { Banner } from "../api/index.ts";
 import type { ReactNode } from "react";
 import { Art } from "./Art.tsx";
 import { ChevronRightIcon } from "./icons.tsx";
 
 /** 点击横幅后要做的事：滚动到商品列表，或进入某个分类（找不到分类时按关键词搜索）。 */
-export type BannerAction = { kind: "list" } | { kind: "category"; match: RegExp; keyword: string };
+export type BannerAction =
+  | { kind: "list" }
+  | { kind: "category"; match: RegExp; keyword: string }
+  /** 后台设置的轮播图：直接进入指定分类 */
+  | { kind: "categoryId"; id: string };
 
 type Slide = {
   key: string;
@@ -23,7 +29,24 @@ type Slide = {
    * 有图片时只显示图片，文字和插图不再显示。
    */
   image?: string;
+  /** 后台设置的轮播图：背景照片，文字由页面排在照片上（#70）。 */
+  photo?: string;
 };
+
+/** 后台设置的轮播图转成幻灯片。 */
+function fromBanner(banner: Banner): Slide {
+  return {
+    key: banner.id,
+    title: banner.title,
+    highlight: "",
+    sub: banner.description ? [banner.description] : [],
+    subJoin: "",
+    cta: banner.buttonText,
+    action: { kind: "categoryId", id: banner.categoryId },
+    art: null,
+    photo: banner.backgroundImageUrl,
+  };
+}
 
 const AUTOPLAY_MS = 4000;
 /** 手指离开后多久恢复自动播放。 */
@@ -125,10 +148,23 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
   const [reduced, setReduced] = useState(false); // 系统开启了「减少动态效果」
   const resumeTimer = useRef<number | undefined>(undefined);
   const settleTimer = useRef<number | undefined>(undefined);
-  const count = slides.length;
+  // 有后台设置且能正常展示的轮播图就用它们；没有（或接口失败）时用内置示例图。
+  const [custom, setCustom] = useState<Slide[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.listBanners().then(
+      (result) => !cancelled && setCustom(result.items.map(fromBanner)),
+      () => !cancelled && setCustom([]),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const list = custom && custom.length > 0 ? custom : slides;
+  const count = list.length;
 
   // 末尾多放一张第一页的副本：从最后一张往后滑到副本，再瞬间跳回真正的第一张，看起来是无缝循环。
-  const rendered = [...slides, slides[0]];
+  const rendered = count > 1 ? [...list, list[0]] : list;
 
   const goTo = useCallback((target: number, smooth = true) => {
     const el = track.current;
@@ -164,8 +200,14 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
   }, []);
 
   // 自动播放：每次切换后重新计时，所以手动滑动后也会等满 4 秒再切。
+  // 换成后台轮播图后回到第一张
   useEffect(() => {
-    if (held || hidden || reduced) return;
+    goTo(0, false);
+    setIndex(0);
+  }, [list, goTo]);
+
+  useEffect(() => {
+    if (held || hidden || reduced || count < 2) return;
     const timer = window.setTimeout(() => {
       const el = track.current;
       if (!el) return;
@@ -173,7 +215,7 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
       goTo(raw + 1);
     }, AUTOPLAY_MS);
     return () => window.clearTimeout(timer);
-  }, [index, held, hidden, reduced, goTo]);
+  }, [index, held, hidden, reduced, goTo, count]);
 
   const hold = () => {
     window.clearTimeout(resumeTimer.current);
@@ -210,10 +252,10 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
         ))}
       </div>
 
-      {/* 指示点：卡片下方的灰色小点，当前页颜色更深 */}
-      <div className="mt-1.5 flex justify-center">
+      {/* 指示点：卡片下方的灰色小点，当前页颜色更深；只有一张时不显示 */}
+      <div className={`mt-1.5 flex justify-center ${count < 2 ? "invisible" : ""}`}>
         <div className="flex items-center">
-          {slides.map((slide, i) => (
+          {list.map((slide, i) => (
             <button
               key={slide.key}
               type="button"
@@ -231,7 +273,66 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
   );
 }
 
+/**
+ * 后台设置的轮播图：照片铺满卡片（居中裁剪），左侧一层白色渐变保证文字清楚。
+ * 后台编辑页的预览也用这个，保证看到的和首页一样。
+ */
+export function PhotoBanner({
+  photo,
+  title,
+  description,
+  buttonText,
+  onClick,
+  focusable = true,
+}: {
+  photo: string | null;
+  title: string;
+  description: string;
+  buttonText: string;
+  onClick?: () => void;
+  focusable?: boolean;
+}) {
+  return (
+    <div className={`relative h-[188px] overflow-hidden bg-page ${onClick ? "cursor-pointer" : ""}`} onClick={onClick}>
+      {photo && <img src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: "linear-gradient(90deg, rgba(255,255,255,0.94) 0%, rgba(255,255,255,0.8) 42%, rgba(255,255,255,0) 72%)" }}
+        aria-hidden="true"
+      />
+      <div className="relative flex h-full flex-col justify-center pl-6 pr-[38%]">
+        {title && <h2 className="headline line-clamp-2 break-words text-[24px] font-semibold leading-[1.2] text-ink">{title}</h2>}
+        {description && <p className="mt-1.5 line-clamp-2 break-words text-[13px] leading-snug text-ink/70">{description}</p>}
+        <button
+          type="button"
+          tabIndex={focusable ? 0 : -1}
+          onClick={(event) => {
+            event.stopPropagation();
+            onClick?.();
+          }}
+          className="relative mt-2.5 inline-flex w-fit items-center gap-0.5 whitespace-nowrap text-[15px] font-medium text-brand after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] active:opacity-60"
+        >
+          {buttonText}
+          <ChevronRightIcon size={15} strokeWidth={2.2} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SlideView({ slide, onAction, focusable }: { slide: Slide; onAction: (a: BannerAction) => void; focusable: boolean }) {
+  if (slide.photo !== undefined) {
+    return (
+      <PhotoBanner
+        photo={slide.photo}
+        title={slide.title}
+        description={slide.sub.join("")}
+        buttonText={slide.cta}
+        onClick={() => onAction(slide.action)}
+        focusable={focusable}
+      />
+    );
+  }
   if (slide.image) {
     return (
       <button type="button" tabIndex={focusable ? 0 : -1} onClick={() => onAction(slide.action)} className="block h-[188px] w-full">

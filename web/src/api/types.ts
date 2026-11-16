@@ -3,6 +3,12 @@
 export type {
   Shop,
   ShopPatch,
+  Banner,
+  AdminBanner,
+  BannerCreate,
+  BannerPatch,
+  bannerTextLimits,
+  maxBanners,
   Category,
   ProductListItem,
   ProductDetail,

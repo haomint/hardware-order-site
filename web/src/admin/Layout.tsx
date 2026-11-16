@@ -46,6 +46,9 @@ export function AdminLayout() {
           <NavLink to="/admin/categories" className={tab}>
             分类
           </NavLink>
+          <NavLink to="/admin/banners" className={tab}>
+            轮播
+          </NavLink>
           <NavLink to="/admin/shop" className={tab}>
             店铺
           </NavLink>
