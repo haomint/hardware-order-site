@@ -49,7 +49,7 @@ export function Categories() {
             {state.data.items.map((category) => (
               <li key={category.id} className="border-b border-line last:border-b-0">
                 <Link to={`/?c=${encodeURIComponent(category.id)}`} className="flex items-center gap-4 py-3 active:opacity-60">
-                  <CategoryIcon name={category.name} size={56} />
+                  <CategoryIcon name={category.name} iconUrl={category.iconUrl} size={56} />
                   <span className="min-w-0 flex-1 break-words text-[17px] text-ink">{category.name}</span>
                   <ChevronRightIcon size={18} className="shrink-0 text-faint" />
                 </Link>
