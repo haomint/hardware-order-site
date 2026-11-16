@@ -206,8 +206,10 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
     setIndex(0);
   }, [list, goTo]);
 
+  // 加载中显示的是灰色占位、还没有可滑动的轨道：等加载完再开始计时，否则这次计时落空、之后不会再排（#98 审查）。
+  const ready = custom !== null;
   useEffect(() => {
-    if (held || hidden || reduced || count < 2) return;
+    if (!ready || held || hidden || reduced || count < 2) return;
     const timer = window.setTimeout(() => {
       const el = track.current;
       if (!el) return;
@@ -215,7 +217,7 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
       goTo(raw + 1);
     }, AUTOPLAY_MS);
     return () => window.clearTimeout(timer);
-  }, [index, held, hidden, reduced, goTo, count]);
+  }, [ready, index, held, hidden, reduced, goTo, count]);
 
   const hold = () => {
     window.clearTimeout(resumeTimer.current);
@@ -225,6 +227,17 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
     window.clearTimeout(resumeTimer.current);
     resumeTimer.current = window.setTimeout(() => setHeld(false), RESUME_MS);
   };
+
+  // 还没问到后台有没有设置轮播图：先放一块同样大小的灰底，避免先闪一下内置示例图再换成店主的图。
+  // 下面留出指示点的高度，多张时加载完不跳动。
+  if (custom === null) {
+    return (
+      <section aria-label="店铺横幅" aria-busy="true">
+        <div className="h-[188px] rounded-[22px] bg-page" />
+        <div className="mt-1.5 h-6" />
+      </section>
+    );
+  }
 
   return (
     <section aria-roledescription="轮播" aria-label="店铺横幅" className="relative">
@@ -252,8 +265,9 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
         ))}
       </div>
 
-      {/* 指示点：卡片下方的灰色小点，当前页颜色更深；只有一张时不显示 */}
-      <div className={`mt-1.5 flex justify-center ${count < 2 ? "invisible" : ""}`}>
+      {/* 指示点：卡片下方的灰色小点，当前页颜色更深；只有一张时不显示，也不占位置（#97） */}
+      {count > 1 && (
+      <div className="mt-1.5 flex justify-center">
         <div className="flex items-center">
           {list.map((slide, i) => (
             <button
@@ -269,6 +283,7 @@ export function BannerCarousel({ onAction }: { onAction: (action: BannerAction) 
           ))}
         </div>
       </div>
+      )}
     </section>
   );
 }
